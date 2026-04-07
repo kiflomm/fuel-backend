@@ -42,6 +42,7 @@ lerna-debug.log*
 .env.production.local
 .env.local 
 /drizzle-dev
+/docs
 
 # temp directory
 .temp
