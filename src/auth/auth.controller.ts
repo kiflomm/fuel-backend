@@ -26,13 +26,27 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import type { CurrentUserPayload } from './decorators/current-user.decorator';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiCookieAuth,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 
+@ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Register a new user account' })
+  @ApiBody({ type: RegisterDto })
+  @ApiCreatedResponse({ description: 'User registered successfully' })
   async register(@Body() registerDto: RegisterDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.register(registerDto);
 
@@ -59,6 +73,9 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Log in with email and password' })
+  @ApiBody({ type: LoginDto })
+  @ApiOkResponse({ description: 'Login successful' })
   async login(@Body() loginDto: LoginDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.login(loginDto);
 
@@ -86,6 +103,10 @@ export class AuthController {
   @Post('refresh')
   @UseGuards(JwtRefreshGuard)
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Refresh access token using refresh token cookie' })
+  @ApiCookieAuth('refreshToken')
+  @ApiOkResponse({ description: 'Token refreshed successfully' })
+  @ApiUnauthorizedResponse({ description: 'Invalid or expired refresh token' })
   async refresh(
     @CurrentUser() user: CurrentUserPayload & { tokenId: number },
     @Res({ passthrough: true }) res: Response,
@@ -116,6 +137,10 @@ export class AuthController {
   @Post('logout')
   @UseGuards(JwtRefreshGuard)
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Log out user and clear refresh token cookie' })
+  @ApiCookieAuth('refreshToken')
+  @ApiOkResponse({ description: 'Logout successful' })
+  @ApiUnauthorizedResponse({ description: 'Invalid or expired refresh token' })
   async logout(
     @CurrentUser() user: CurrentUserPayload & { tokenId: number },
     @Res({ passthrough: true }) res: Response,
@@ -134,6 +159,10 @@ export class AuthController {
 
   @Get('profile')
   @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get current user profile' })
+  @ApiBearerAuth('JWT-auth')
+  @ApiOkResponse({ description: 'Profile retrieved successfully' })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   async getProfile(@CurrentUser() user: CurrentUserPayload) {
     const profile = await this.authService.getProfile(user.id);
 
@@ -148,6 +177,11 @@ export class AuthController {
   @Put('profile')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Update current user profile' })
+  @ApiBearerAuth('JWT-auth')
+  @ApiBody({ type: UpdateProfileDto })
+  @ApiOkResponse({ description: 'Profile updated successfully' })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   async updateProfile(
     @CurrentUser() user: CurrentUserPayload,
     @Body() updateProfileDto: UpdateProfileDto,
@@ -165,6 +199,11 @@ export class AuthController {
   @Put('change-password')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Change current user password' })
+  @ApiBearerAuth('JWT-auth')
+  @ApiBody({ type: ChangePasswordDto })
+  @ApiOkResponse({ description: 'Password changed successfully' })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   async changePassword(
     @CurrentUser() user: CurrentUserPayload,
     @Body() changePasswordDto: ChangePasswordDto,
@@ -180,6 +219,9 @@ export class AuthController {
 
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Request a password reset code via email' })
+  @ApiBody({ type: ForgotPasswordDto })
+  @ApiOkResponse({ description: 'Password reset code sent if account exists' })
   async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
     const result = await this.authService.forgotPassword(forgotPasswordDto);
 
@@ -192,6 +234,9 @@ export class AuthController {
 
   @Post('verify-reset-code')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify password reset code' })
+  @ApiBody({ type: VerifyResetCodeDto })
+  @ApiOkResponse({ description: 'Code verified successfully' })
   async verifyResetCode(@Body() verifyResetCodeDto: VerifyResetCodeDto) {
     const result = await this.authService.verifyResetCode(verifyResetCodeDto.code);
 
@@ -205,6 +250,9 @@ export class AuthController {
 
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reset password using verification code' })
+  @ApiBody({ type: ResetPasswordDto })
+  @ApiOkResponse({ description: 'Password reset successfully' })
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     await this.authService.resetPassword(resetPasswordDto);
 
