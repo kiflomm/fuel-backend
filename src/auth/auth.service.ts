@@ -12,12 +12,14 @@ import {
   import { Inject } from '@nestjs/common';
   import * as schema from '../database/schema';
   import { eq, and, gt } from 'drizzle-orm';
-  import { LoginDto } from './dto/login.dto';
-  import { RegisterDto } from './dto/register.dto';
-  import { ForgotPasswordDto } from './dto/forgot-password.dto';
-  import { ResetPasswordDto } from './dto/reset-password.dto';
-  import { ChangePasswordDto } from './dto/change-password.dto';
-  import { UpdateProfileDto } from './dto/update-profile.dto';
+  import {
+    LoginDto,
+    RegisterDto,
+    ForgotPasswordDto,
+    ResetPasswordDto,
+    ChangePasswordDto,
+    UpdateProfileDto,
+  } from './dto/dto.export';
   import { randomBytes, createHash } from 'crypto';
   import { MailerService } from '../mailer/mailer.service';
   
