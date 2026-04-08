@@ -12,6 +12,16 @@ async function bootstrap() {
     .setDescription('API documentation for Fuel Monitor backend')
     .setVersion('1.0.0')
     .addServer(process.env.SERVER_URL || 'http://localhost:3000', 'Development server')
+    .addCookieAuth(
+      'refreshToken',
+      {
+        type: 'apiKey',
+        in: 'cookie',
+        name: 'refreshToken',
+        description: 'Refresh token stored in cookie',
+      },
+      'refreshToken',
+    )
     .addBearerAuth(
       {
         type: 'http',
@@ -25,12 +35,11 @@ async function bootstrap() {
     )
     .build();
   const documentFactory = () => SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api/docs', app, documentFactory, {
-      swaggerOptions: {
-        persistAuthorization: true,
-      },
-    }
-  );
+  if (process.env.NODE_ENV !== 'production' || true) {
+    SwaggerModule.setup('api/docs', app, documentFactory, {
+      swaggerOptions: { persistAuthorization: true },
+    });
+  }
 
   // Enable CORS with credentials
   app.enableCors({
