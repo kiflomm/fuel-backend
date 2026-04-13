@@ -7,17 +7,13 @@ import { DrizzleAsyncProvider } from '../../database/drizzle.provider';
 import { Inject } from '@nestjs/common';
 import * as schema from '../../database/schema';
 import { eq } from 'drizzle-orm';
+import type { UserRole } from '../../database/enums';
 
 export interface JwtPayload {
   sub: number;
   email: string;
-  role:
-    | 'ADMIN'
-    | 'GENERAL_FINANCE'
-    | 'COLLEGE_FINANCE'
-    | 'FACILITATOR'
-    | 'GENERAL_FACILITATOR'
-    | 'GUEST';
+  role: UserRole;
+  stationId: number | null;
 }
 
 @Injectable()
@@ -49,6 +45,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       id: user.id,
       email: user.email,
       role: user.role,
+      stationId: user.stationId ?? null,
     };
   }
 }

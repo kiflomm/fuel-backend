@@ -1,16 +1,12 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+import type { UserRole } from '../../database/enums';
 
 export interface CurrentUserPayload {
   id: number;
   email: string;
-  role:
-    | 'ADMIN'
-    | 'GENERAL_FINANCE'
-    | 'COLLEGE_FINANCE'
-    | 'FACILITATOR'
-    | 'GENERAL_FACILITATOR'
-    | 'GUEST';
-  collegeId: number | null;
+  role: UserRole;
+  /** Set for station staff; null for government admin and vehicle owners. */
+  stationId: number | null;
 }
 
 export const CurrentUser = createParamDecorator(

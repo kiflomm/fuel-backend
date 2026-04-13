@@ -22,6 +22,7 @@ import {
   } from './dto/dto.export';
   import { randomBytes, createHash } from 'crypto';
   import { MailerService } from '../mailer/mailer.service';
+  import type { UserRole } from '../database/enums';
   
   @Injectable()
   export class AuthService {
@@ -57,50 +58,24 @@ import {
       return user;
     }
   
-    async register(registerDto: RegisterDto) {
-      // Check if user already exists
-      const [existingUser] = await this.db
-        .select()
-        .from(schema.users)
-        .where(eq(schema.users.email, registerDto.email))
-        .limit(1);
-  
-      if (existingUser) {
-        throw new BadRequestException('Email already registered');
-      }
-  
-      // Hash password
-      const hashedPassword = await bcrypt.hash(registerDto.password, 10);
-  
-      // Create guest user
-      const [user] = await this.db
-        .insert(schema.users)
-        .values({
-          email: registerDto.email,
-          password: hashedPassword,
-          firstName: registerDto.firstName,
-          lastName: registerDto.lastName,
-          role: 'GUEST',
-          isActive: true,
-        })
-        .returning();
-  
-      const tokens = await this.generateTokens(user);
-  
-      return {
-        accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken,
-        user: {
-          id: user.id.toString(),
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          role: user.role,
-          isActive: user.isActive,
-          createdAt: user.createdAt.toISOString(),
-          updatedAt: user.updatedAt.toISOString(),
-        },
+    async register(_registerDto: RegisterDto): Promise<{
+      accessToken: string;
+      refreshToken: string;
+      user: {
+        id: string;
+        email: string;
+        firstName: string;
+        lastName: string;
+        role: UserRole;
+        stationId: number | null;
+        isActive: boolean;
+        createdAt: string;
+        updatedAt: string;
       };
+    }> {
+      throw new BadRequestException(
+        'Public registration is disabled. Accounts are created by a government administrator.',
+      );
     }
   
     async login(loginDto: LoginDto) {
@@ -117,6 +92,7 @@ import {
           firstName: user.firstName,
           lastName: user.lastName,
           role: user.role,
+          stationId: user.stationId ?? null,
           isActive: user.isActive,
           createdAt: user.createdAt.toISOString(),
           updatedAt: user.updatedAt.toISOString(),
@@ -152,6 +128,7 @@ import {
           firstName: user.firstName,
           lastName: user.lastName,
           role: user.role,
+          stationId: user.stationId ?? null,
           isActive: user.isActive,
           createdAt: user.createdAt.toISOString(),
           updatedAt: user.updatedAt.toISOString(),
@@ -182,6 +159,7 @@ import {
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role,
+        stationId: user.stationId ?? null,
         isActive: user.isActive,
         createdAt: user.createdAt.toISOString(),
         updatedAt: user.updatedAt.toISOString(),
@@ -231,6 +209,7 @@ import {
         firstName: updatedUser.firstName,
         lastName: updatedUser.lastName,
         role: updatedUser.role,
+        stationId: updatedUser.stationId ?? null,
         isActive: updatedUser.isActive,
         createdAt: updatedUser.createdAt.toISOString(),
         updatedAt: updatedUser.updatedAt.toISOString(),
@@ -379,6 +358,7 @@ import {
         sub: user.id,
         email: user.email,
         role: user.role,
+        stationId: user.stationId ?? null,
       };
   
       // Access token uses default options from JWT module configuration

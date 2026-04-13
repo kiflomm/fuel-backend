@@ -7,6 +7,7 @@ import {
   integer,
 } from 'drizzle-orm/pg-core';
 import { userRoleEnum } from '../enums';
+import { stations } from './stations';
 
 // Users table
 export const users = pgTable('users', {
@@ -15,7 +16,11 @@ export const users = pgTable('users', {
   password: text('password').notNull(),
   firstName: text('first_name').notNull(),
   lastName: text('last_name').notNull(),
-  role: userRoleEnum('role').notNull().default('FACILITATOR'),
+  role: userRoleEnum('role').notNull().default('VEHICLE_OWNER'),
+  /** Set for STATION_MANAGER and STATION_WORKER; null for GOVERNMENT_ADMIN and VEHICLE_OWNER. */
+  stationId: integer('station_id').references(() => stations.id, {
+    onDelete: 'set null',
+  }),
   isActive: boolean('is_active').notNull().default(true),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
