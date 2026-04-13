@@ -31,6 +31,25 @@
 $ pnpm install
 ```
 
+## First government admin
+
+Public registration is disabled. To use admin onboarding APIs you need at least one `GOVERNMENT_ADMIN` user.
+
+**Option A — seed script (recommended for dev)**
+
+After applying database migrations, from the `backend/` directory:
+
+```bash
+export DATABASE_URL="postgresql://user:pass@localhost:5432/yourdb"
+export SEED_ADMIN_EMAIL="admin@example.com"
+export SEED_ADMIN_PASSWORD="your-secure-password"
+pnpm db:seed:admin
+```
+
+**Option B — manual SQL**
+
+Insert a row into `users` with `role = 'GOVERNMENT_ADMIN'`, `station_id` null, and a **bcrypt** hash (`cost factor 10`) in `password` matching how [auth login](src/auth/auth.service.ts) verifies passwords.
+
 ## Compile and run the project
 
 ```bash
