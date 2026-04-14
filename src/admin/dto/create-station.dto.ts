@@ -3,7 +3,6 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
-  IsObject,
   IsIn,
 } from 'class-validator';
 import type { StationFuelStatus } from '../../database/enums';
@@ -29,14 +28,6 @@ export class CreateStationDto {
   @IsOptional()
   @IsString()
   phone?: string;
-
-  @ApiPropertyOptional({
-    example: { mon: { open: '06:00', close: '18:00' } },
-    description: 'Structured operating hours (opaque JSON for clients)',
-  })
-  @IsOptional()
-  @IsObject()
-  operatingHours?: Record<string, unknown>;
 
   @ApiPropertyOptional({ enum: STATION_FUEL_STATUSES })
   @IsOptional()

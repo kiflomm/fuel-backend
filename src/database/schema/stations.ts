@@ -4,7 +4,6 @@ import {
   timestamp,
   text,
   boolean,
-  json,
 } from 'drizzle-orm/pg-core';
 import { stationFuelStatusEnum } from '../enums';
 
@@ -20,8 +19,6 @@ export const stations = pgTable('stations', {
   isActive: boolean('is_active').notNull().default(true),
   queueIntakePaused: boolean('queue_intake_paused').notNull().default(false),
   fuelStatus: stationFuelStatusEnum('fuel_status').notNull().default('AVAILABLE'),
-  /** Optional structured hours, e.g. { mon: { open: "06:00", close: "18:00" } } */
-  operatingHours: json('operating_hours').$type<Record<string, unknown> | null>(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });

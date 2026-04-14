@@ -60,7 +60,6 @@ export class AdminService {
       isActive: row.isActive,
       queueIntakePaused: row.queueIntakePaused,
       fuelStatus: row.fuelStatus,
-      operatingHours: row.operatingHours,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };
@@ -75,7 +74,6 @@ export class AdminService {
           address: dto.address ?? null,
           city: dto.city ?? null,
           phone: dto.phone ?? null,
-          operatingHours: dto.operatingHours ?? null,
           fuelStatus: dto.fuelStatus ?? 'AVAILABLE',
         })
         .returning();
@@ -105,7 +103,6 @@ export class AdminService {
     if (dto.address !== undefined) patch.address = dto.address;
     if (dto.city !== undefined) patch.city = dto.city;
     if (dto.phone !== undefined) patch.phone = dto.phone;
-    if (dto.operatingHours !== undefined) patch.operatingHours = dto.operatingHours;
     if (dto.fuelStatus !== undefined) patch.fuelStatus = dto.fuelStatus;
     if (dto.isActive !== undefined) patch.isActive = dto.isActive;
     if (dto.queueIntakePaused !== undefined)

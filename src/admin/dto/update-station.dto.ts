@@ -3,7 +3,6 @@ import {
   IsBoolean,
   IsOptional,
   IsString,
-  IsObject,
   IsIn,
 } from 'class-validator';
 import type { StationFuelStatus } from '../../database/enums';
@@ -29,11 +28,6 @@ export class UpdateStationDto {
   @IsOptional()
   @IsString()
   phone?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsObject()
-  operatingHours?: Record<string, unknown>;
 
   @ApiPropertyOptional({ enum: STATION_FUEL_STATUSES })
   @IsOptional()
