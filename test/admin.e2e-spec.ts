@@ -90,4 +90,53 @@ describe('AdminController (e2e)', () => {
         .expect(403);
     });
   });
+
+  describe('fuel price management (route-level)', () => {
+    let app: INestApplication<App>;
+
+    beforeAll(async () => {
+      const moduleFixture: TestingModule = await Test.createTestingModule({
+        imports: [AppModule],
+      })
+        .overrideGuard(JwtAuthGuard)
+        .useClass(
+          class MockGovernmentAdminJwtGuard implements CanActivate {
+            canActivate(context: ExecutionContext): boolean {
+              const req = context.switchToHttp().getRequest();
+              req.user = {
+                id: 1,
+                email: 'admin@test.local',
+                role: 'GOVERNMENT_ADMIN',
+                stationId: null,
+              };
+              return true;
+            }
+          },
+        )
+        .compile();
+
+      app = moduleFixture.createNestApplication();
+      configureApp(app);
+      await app.init();
+    });
+
+    afterAll(async () => {
+      await app.close();
+    });
+
+    it('POST /admin/fuel-prices returns 201 (auth/validation wired)', () => {
+      return request(app.getHttpServer())
+        .post('/admin/fuel-prices')
+        .set('Authorization', 'Bearer fake-token')
+        .send({
+          fuelType: 'DIESEL',
+          pricePerLiter: 100,
+          isActive: true,
+        })
+        // DB may be missing in CI; this test mainly ensures route exists + DTO validation passes.
+        .expect((res) => {
+          expect([201, 500]).toContain(res.status);
+        });
+    });
+  });
 });

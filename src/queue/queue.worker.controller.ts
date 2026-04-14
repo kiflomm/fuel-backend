@@ -1,0 +1,86 @@
+import {
+  Body,
+  Controller,
+  HttpCode,
+  HttpStatus,
+  Post,
+  UseGuards,
+  BadRequestException,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiForbiddenResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
+import { QueueService } from './queue.service';
+import { WorkerVerifyDto } from './dto/worker-verify.dto';
+import { WorkerCompleteDto } from './dto/worker-complete.dto';
+
+@ApiTags('Queue (Worker)')
+@ApiBearerAuth('JWT-auth')
+@ApiUnauthorizedResponse({ description: 'Missing or invalid JWT' })
+@ApiForbiddenResponse({ description: 'Not a station worker' })
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('STATION_WORKER')
+@Controller('queue/worker')
+export class QueueWorkerController {
+  constructor(private readonly queueService: QueueService) {}
+
+  @Post('verify')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify a queue booking by scanning its QR token' })
+  @ApiOkResponse({ description: 'Booking verified' })
+  async verify(
+    @CurrentUser() user: CurrentUserPayload,
+    @Body() dto: WorkerVerifyDto,
+  ) {
+    if (!user.stationId) {
+      throw new BadRequestException('Station worker is not assigned to a station');
+    }
+    const data = await this.queueService.workerVerifyBooking(
+      user.id,
+      user.stationId,
+      dto.verifyToken,
+    );
+    return {
+      success: true,
+      message: 'Booking verified',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Post('complete')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Complete a verified booking and create a transaction' })
+  @ApiOkResponse({ description: 'Transaction created (idempotent)' })
+  async complete(
+    @CurrentUser() user: CurrentUserPayload,
+    @Body() dto: WorkerCompleteDto,
+  ) {
+    if (!user.stationId) {
+      throw new BadRequestException('Station worker is not assigned to a station');
+    }
+    const data = await this.queueService.workerCompleteBooking(
+      user.id,
+      user.stationId,
+      dto.verifyToken,
+      dto.receiptRef,
+    );
+    return {
+      success: true,
+      message: 'Booking completed',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+}
+

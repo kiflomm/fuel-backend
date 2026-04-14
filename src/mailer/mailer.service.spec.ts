@@ -2,5 +2,11 @@ import { ConfigService } from '@nestjs/config';
 import { MailerService } from './mailer.service';
 
 describe('MailerService', () => {
-  // Boilerplate - add tests here
+  it('constructs', () => {
+    const config = {
+      get: () => undefined,
+    } as unknown as ConfigService;
+    const svc = new MailerService(config);
+    expect(svc).toBeTruthy();
+  });
 });

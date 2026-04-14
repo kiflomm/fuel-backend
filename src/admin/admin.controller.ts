@@ -30,6 +30,7 @@ import { UpdateStationDto } from './dto/update-station.dto';
 import { CreateStationManagerDto } from './dto/create-station-manager.dto';
 import { CreateVehicleOwnerDto } from './dto/create-vehicle-owner.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
+import { UpsertFuelPriceDto } from './dto/upsert-fuel-price.dto';
 
 @ApiTags('Admin')
 @ApiBearerAuth('JWT-auth')
@@ -125,6 +126,33 @@ export class AdminController {
     return {
       success: true,
       message: 'User status updated',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Post('fuel-prices')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Create or update a fuel price by fuel type' })
+  @ApiCreatedResponse({ description: 'Fuel price upserted' })
+  async upsertFuelPrice(@Body() dto: UpsertFuelPriceDto) {
+    const data = await this.adminService.upsertFuelPrice(dto);
+    return {
+      success: true,
+      message: 'Fuel price saved',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Get('fuel-prices')
+  @ApiOperation({ summary: 'List configured fuel prices' })
+  @ApiOkResponse({ description: 'Fuel prices' })
+  async listFuelPrices() {
+    const data = await this.adminService.listFuelPrices();
+    return {
+      success: true,
+      message: 'Fuel prices retrieved',
       data,
       timestamp: new Date().toISOString(),
     };

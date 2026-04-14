@@ -423,4 +423,192 @@ export class QueueService {
       bookedAt: booking.bookedAt.toISOString(),
     };
   }
+
+  async workerVerifyBooking(
+    stationWorkerUserId: number,
+    stationId: number,
+    verifyToken: string,
+  ) {
+    const [booking] = await this.db
+      .select()
+      .from(schema.queueBookings)
+      .where(eq(schema.queueBookings.verifyToken, verifyToken))
+      .limit(1);
+    if (!booking) {
+      throw new NotFoundException('Queue booking not found');
+    }
+    if (booking.stationId !== stationId) {
+      throw new ForbiddenException('Not allowed to verify bookings for another station');
+    }
+    if (booking.status !== 'ACTIVE') {
+      throw new BadRequestException(`Queue booking is not active (status: ${booking.status})`);
+    }
+
+    const [payment] = await this.db
+      .select()
+      .from(schema.payments)
+      .where(eq(schema.payments.id, booking.paymentId))
+      .limit(1);
+    if (!payment) {
+      throw new NotFoundException('Payment not found');
+    }
+
+    const [vehicle] = await this.db
+      .select()
+      .from(schema.vehicles)
+      .where(eq(schema.vehicles.id, booking.vehicleId))
+      .limit(1);
+    if (!vehicle) {
+      throw new NotFoundException('Vehicle not found');
+    }
+
+    const [owner] = await this.db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.id, vehicle.ownerUserId))
+      .limit(1);
+    if (!owner) {
+      throw new NotFoundException('Vehicle owner not found');
+    }
+
+    const [existingTxn] = await this.db
+      .select()
+      .from(schema.transactions)
+      .where(eq(schema.transactions.queueBookingId, booking.id))
+      .limit(1);
+
+    return {
+      stationWorkerUserId,
+      booking: {
+        id: booking.id,
+        stationId: booking.stationId,
+        vehicleId: booking.vehicleId,
+        paymentId: booking.paymentId,
+        status: booking.status,
+        stationSequence: booking.stationSequence,
+        bookedAt: booking.bookedAt.toISOString(),
+      },
+      vehicle: {
+        id: vehicle.id,
+        plateNumber: vehicle.plateNumber,
+        category: vehicle.category,
+        label: vehicle.label,
+      },
+      owner: {
+        id: owner.id,
+        email: owner.email,
+        firstName: owner.firstName,
+        lastName: owner.lastName,
+      },
+      payment: {
+        id: payment.id,
+        status: payment.status,
+        fuelType: payment.fuelType,
+        litersRequested: payment.litersRequested,
+        pricePerLiter: payment.pricePerLiter,
+        amount: payment.amount,
+        currency: payment.currency,
+        paidAt: payment.paidAt ? payment.paidAt.toISOString() : null,
+      },
+      transaction: existingTxn
+        ? {
+            id: existingTxn.id,
+            litersDispensed: existingTxn.litersDispensed,
+            receiptRef: existingTxn.receiptRef ?? null,
+            servedAt: existingTxn.servedAt.toISOString(),
+          }
+        : null,
+    };
+  }
+
+  async workerCompleteBooking(
+    stationWorkerUserId: number,
+    stationId: number,
+    verifyToken: string,
+    receiptRef?: string,
+  ) {
+    const result = await this.db.transaction(async (tx) => {
+      const [booking] = await tx
+        .select()
+        .from(schema.queueBookings)
+        .where(eq(schema.queueBookings.verifyToken, verifyToken))
+        .limit(1);
+      if (!booking) {
+        throw new NotFoundException('Queue booking not found');
+      }
+      if (booking.stationId !== stationId) {
+        throw new ForbiddenException('Not allowed to complete bookings for another station');
+      }
+
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(${booking.id})`);
+
+      const [existingTxn] = await tx
+        .select()
+        .from(schema.transactions)
+        .where(eq(schema.transactions.queueBookingId, booking.id))
+        .limit(1);
+      if (existingTxn) {
+        return { booking, txn: existingTxn, created: false as const };
+      }
+
+      if (booking.status !== 'ACTIVE') {
+        throw new BadRequestException(`Queue booking is not active (status: ${booking.status})`);
+      }
+
+      const [payment] = await tx
+        .select()
+        .from(schema.payments)
+        .where(eq(schema.payments.id, booking.paymentId))
+        .limit(1);
+      if (!payment) {
+        throw new NotFoundException('Payment not found');
+      }
+      if (payment.status !== 'SUCCESS') {
+        throw new BadRequestException('Payment is not successful');
+      }
+
+      const litersDispensed = String(payment.litersRequested);
+
+      const [txn] = await tx
+        .insert(schema.transactions)
+        .values({
+          stationId: booking.stationId,
+          vehicleId: booking.vehicleId,
+          paymentId: booking.paymentId,
+          queueBookingId: booking.id,
+          stationWorkerUserId,
+          litersDispensed,
+          receiptRef: receiptRef?.trim() ? receiptRef.trim() : null,
+        })
+        .returning();
+
+      if (!txn) {
+        throw new BadRequestException('Could not create transaction');
+      }
+
+      await tx
+        .update(schema.queueBookings)
+        .set({
+          status: 'SERVED',
+          servedAt: txn.servedAt,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.queueBookings.id, booking.id));
+
+      return { booking, txn, created: true as const };
+    });
+
+    return {
+      created: result.created,
+      transactionId: result.txn.id,
+      queueBookingId: result.txn.queueBookingId,
+      stationId: result.txn.stationId,
+      vehicleId: result.txn.vehicleId,
+      paymentId: result.txn.paymentId,
+      stationWorkerUserId: result.txn.stationWorkerUserId,
+      litersDispensed: result.txn.litersDispensed,
+      receiptRef: result.txn.receiptRef ?? null,
+      servedAt: result.txn.servedAt.toISOString(),
+    };
+  }
 }

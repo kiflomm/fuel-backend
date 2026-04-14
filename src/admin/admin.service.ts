@@ -15,6 +15,7 @@ import { UpdateStationDto } from './dto/update-station.dto';
 import { CreateStationManagerDto } from './dto/create-station-manager.dto';
 import { CreateVehicleOwnerDto } from './dto/create-vehicle-owner.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
+import { UpsertFuelPriceDto } from './dto/upsert-fuel-price.dto';
 
 function isPgUniqueViolation(error: unknown): boolean {
   return (
@@ -240,5 +241,73 @@ export class AdminService {
       .where(eq(schema.users.id, targetUserId))
       .returning();
     return this.mapUser(updated!);
+  }
+
+  async upsertFuelPrice(dto: UpsertFuelPriceDto) {
+    const patch = {
+      fuelType: dto.fuelType,
+      pricePerLiter: dto.pricePerLiter.toFixed(2),
+      isActive: dto.isActive ?? true,
+      updatedAt: new Date(),
+    };
+
+    const [existing] = await this.db
+      .select()
+      .from(schema.fuelPrices)
+      .where(eq(schema.fuelPrices.fuelType, dto.fuelType))
+      .limit(1);
+
+    if (existing) {
+      const [row] = await this.db
+        .update(schema.fuelPrices)
+        .set(patch)
+        .where(eq(schema.fuelPrices.id, existing.id))
+        .returning();
+      return {
+        id: row.id,
+        fuelType: row.fuelType,
+        pricePerLiter: row.pricePerLiter,
+        isActive: row.isActive,
+        createdAt: row.createdAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
+      };
+    }
+
+    try {
+      const [row] = await this.db
+        .insert(schema.fuelPrices)
+        .values({
+          fuelType: patch.fuelType,
+          pricePerLiter: patch.pricePerLiter,
+          isActive: patch.isActive,
+          updatedAt: patch.updatedAt,
+        })
+        .returning();
+      return {
+        id: row.id,
+        fuelType: row.fuelType,
+        pricePerLiter: row.pricePerLiter,
+        isActive: row.isActive,
+        createdAt: row.createdAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
+      };
+    } catch (e) {
+      if (isPgUniqueViolation(e)) {
+        throw new ConflictException('Fuel price conflicts with existing data');
+      }
+      throw e;
+    }
+  }
+
+  async listFuelPrices() {
+    const rows = await this.db.select().from(schema.fuelPrices);
+    return rows.map((row) => ({
+      id: row.id,
+      fuelType: row.fuelType,
+      pricePerLiter: row.pricePerLiter,
+      isActive: row.isActive,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    }));
   }
 }

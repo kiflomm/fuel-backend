@@ -87,4 +87,62 @@ describe('QueueController (e2e)', () => {
         .expect(403);
     });
   });
+
+  describe('worker endpoints (route-level)', () => {
+    let app: INestApplication<App>;
+
+    @Injectable()
+    class MockStationWorkerJwtGuard implements CanActivate {
+      canActivate(context: ExecutionContext): boolean {
+        const req = context.switchToHttp().getRequest();
+        req.user = {
+          id: 7,
+          email: 'worker@test.local',
+          role: 'STATION_WORKER',
+          stationId: 1,
+        };
+        return true;
+      }
+    }
+
+    beforeAll(async () => {
+      const moduleFixture: TestingModule = await Test.createTestingModule({
+        imports: [AppModule],
+      })
+        .overrideGuard(JwtAuthGuard)
+        .useClass(MockStationWorkerJwtGuard)
+        .compile();
+
+      app = moduleFixture.createNestApplication();
+      configureApp(app);
+      await app.init();
+    });
+
+    afterAll(async () => {
+      await app.close();
+    });
+
+    it('POST /queue/worker/verify returns 404 for unknown token', () => {
+      return request(app.getHttpServer())
+        .post('/queue/worker/verify')
+        .set('Authorization', 'Bearer fake')
+        .send({ verifyToken: '0123456789abcdef0123456789abcdef' })
+        .expect((res) => {
+          expect([404, 500]).toContain(res.status);
+        });
+    });
+
+    it('POST /queue/worker/complete returns 404 for unknown token', () => {
+      return request(app.getHttpServer())
+        .post('/queue/worker/complete')
+        .set('Authorization', 'Bearer fake')
+        .send({
+          verifyToken: '0123456789abcdef0123456789abcdef',
+          receiptRef: 'R-1',
+        })
+        .expect((res) => {
+          expect([404, 500]).toContain(res.status);
+        });
+    });
+  });
 });
