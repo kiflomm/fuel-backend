@@ -7,7 +7,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DrizzleAsyncProvider } from '../database/drizzle.provider';
 import { Inject } from '@nestjs/common';
 import * as schema from '../database/schema';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 
 /** UTC day window [start, end) for daily quota. */
 function getUtcDayBounds(now: Date): { start: Date; end: Date } {
@@ -28,7 +28,7 @@ export class QuotaService {
 
   /**
    * Ensures a DAILY balance row exists for the current UTC day and that remaining liters &gt; 0.
-   * Quota is not deducted here (deduction happens when fuel is dispensed).
+   * Quota is deducted at queue-join time once payment is successful.
    */
   async assertVehicleHasQuotaRemaining(vehicleId: number): Promise<{
     remainingLiters: string;
@@ -121,5 +121,65 @@ export class QuotaService {
       remainingLiters: remainingStr,
       litersLimit: String(rule.litersLimit),
     };
+  }
+
+  async assertVehicleHasAtLeast(
+    vehicleId: number,
+    litersRequested: string,
+  ): Promise<{
+    remainingLiters: string;
+    litersLimit: string;
+  }> {
+    const base = await this.assertVehicleHasQuotaRemaining(vehicleId);
+    const reqNum = Number(litersRequested);
+    const remNum = Number(base.remainingLiters);
+    if (!Number.isFinite(reqNum) || reqNum <= 0) {
+      throw new BadRequestException('Invalid litersRequested');
+    }
+    if (!Number.isFinite(remNum) || reqNum > remNum) {
+      throw new BadRequestException(
+        'Requested liters exceed remaining quota for this vehicle in the current period',
+      );
+    }
+    return base;
+  }
+
+  async deductDailyQuota(
+    tx: NodePgDatabase<typeof schema>,
+    vehicleId: number,
+    liters: string,
+  ): Promise<{ remainingLiters: string }> {
+    const reqNum = Number(liters);
+    if (!Number.isFinite(reqNum) || reqNum <= 0) {
+      throw new BadRequestException('Invalid liters to deduct');
+    }
+
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(${vehicleId})`);
+
+    // Ensure balance row exists and get current remaining.
+    const { remainingLiters } = await this.assertVehicleHasQuotaRemaining(vehicleId);
+    const remainingNum = Number(remainingLiters);
+    if (!Number.isFinite(remainingNum) || remainingNum < reqNum) {
+      throw new BadRequestException(
+        'Requested liters exceed remaining quota for this vehicle in the current period',
+      );
+    }
+
+    const newRemaining = (Math.round((remainingNum - reqNum) * 100) / 100).toFixed(2);
+
+    await tx
+      .update(schema.vehicleQuotaBalances)
+      .set({
+        remainingLiters: newRemaining,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(schema.vehicleQuotaBalances.vehicleId, vehicleId),
+          eq(schema.vehicleQuotaBalances.period, 'DAILY'),
+        ),
+      );
+
+    return { remainingLiters: newRemaining };
   }
 }

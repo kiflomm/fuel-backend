@@ -42,11 +42,7 @@ export class QueueService {
     private readonly quotaService: QuotaService,
   ) {}
 
-  private paymentAmount(): string {
-    return (
-      this.configService.get<string>('QUEUE_PAYMENT_AMOUNT_ETB') ?? '100.00'
-    );
-  }
+  // ConfigService is still used elsewhere; keep injected for now.
 
   async listStationsWithQueueLength() {
     const rows = await this.db.select().from(schema.stations);
@@ -111,7 +107,15 @@ export class QueueService {
       throw new BadRequestException('Station has no fuel available');
     }
 
-    await this.quotaService.assertVehicleHasQuotaRemaining(dto.vehicleId);
+    if (!Number.isFinite(dto.litersRequested) || dto.litersRequested <= 0) {
+      throw new BadRequestException('Invalid litersRequested');
+    }
+
+    const { remainingLiters } =
+      await this.quotaService.assertVehicleHasAtLeast(
+        dto.vehicleId,
+        String(dto.litersRequested),
+      );
 
     const [user] = await this.db
       .select()
@@ -122,7 +126,34 @@ export class QueueService {
       throw new NotFoundException('User not found');
     }
 
-    const amount = this.paymentAmount();
+    const [priceRow] = await this.db
+      .select()
+      .from(schema.fuelPrices)
+      .where(
+        and(
+          eq(schema.fuelPrices.fuelType, dto.fuelType),
+          eq(schema.fuelPrices.isActive, true),
+        ),
+      )
+      .limit(1);
+    if (!priceRow) {
+      throw new BadRequestException(
+        'No active price configured for this fuel type. Ask an administrator to configure fuel prices.',
+      );
+    }
+
+    const pricePerLiter = Number(priceRow.pricePerLiter);
+    if (!Number.isFinite(pricePerLiter) || pricePerLiter <= 0) {
+      throw new BadRequestException('Invalid fuel price configuration');
+    }
+
+    const amountNum =
+      Math.round(dto.litersRequested * pricePerLiter * 100) / 100;
+    if (!Number.isFinite(amountNum) || amountNum <= 0) {
+      throw new BadRequestException('Invalid computed amount');
+    }
+
+    const amount = amountNum.toFixed(2);
     const txRef = `fuel-v${dto.vehicleId}-s${dto.stationId}-${randomBytes(12).toString('hex')}`;
 
     const [payment] = await this.db
@@ -132,6 +163,9 @@ export class QueueService {
         stationId: dto.stationId,
         txRef,
         status: 'PENDING',
+        fuelType: dto.fuelType,
+        litersRequested: String(dto.litersRequested),
+        pricePerLiter: String(priceRow.pricePerLiter),
         amount,
         currency: 'ETB',
       })
@@ -175,6 +209,10 @@ export class QueueService {
         txRef: payment.txRef,
         amount: payment.amount,
         currency: payment.currency,
+        fuelType: payment.fuelType,
+        litersRequested: payment.litersRequested,
+        pricePerLiter: payment.pricePerLiter,
+        remainingLiters,
         checkoutUrl,
       };
     } catch (e) {
@@ -304,7 +342,10 @@ export class QueueService {
       throw new BadRequestException('Station has no fuel available');
     }
 
-    await this.quotaService.assertVehicleHasQuotaRemaining(payment.vehicleId);
+    await this.quotaService.assertVehicleHasAtLeast(
+      payment.vehicleId,
+      String(payment.litersRequested),
+    );
 
     const [existingBooking] = await this.db
       .select({ id: schema.queueBookings.id })
@@ -320,6 +361,13 @@ export class QueueService {
     const booking = await this.db.transaction(async (tx) => {
       await tx.execute(
         sql`SELECT pg_advisory_xact_lock(${payment.stationId})`,
+      );
+
+      // Deduct quota at join time (payment has already succeeded).
+      await this.quotaService.deductDailyQuota(
+        tx,
+        payment.vehicleId,
+        String(payment.litersRequested),
       );
 
       const [agg] = await tx
