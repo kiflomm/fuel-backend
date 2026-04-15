@@ -1,9 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import {
+  BadRequestException,
   CanActivate,
   ExecutionContext,
   INestApplication,
   Injectable,
+  NotFoundException,
   ValidationPipe,
 } from '@nestjs/common';
 import request from 'supertest';
@@ -11,6 +13,7 @@ import { App } from 'supertest/types';
 import cookieParser from 'cookie-parser';
 import { AppModule } from '../src/app.module';
 import { JwtAuthGuard } from '../src/auth/guards/jwt-auth.guard';
+import { StationManagerService } from '../src/station-manager/station-manager.service';
 
 @Injectable()
 class MockVehicleOwnerJwtGuard implements CanActivate {
@@ -35,6 +38,71 @@ function configureApp(app: INestApplication) {
       transform: true,
     }),
   );
+}
+
+class MockStationManagerService {
+  async createStationWorker() {
+    return { worker: { id: '10' }, station: { id: 1 } };
+  }
+
+  async listStationWorkers() {
+    return [{ id: '10', role: 'STATION_WORKER', stationId: 1 }];
+  }
+
+  async getStationWorker(_managerId: number, workerId: number) {
+    if (workerId === 999) {
+      throw new NotFoundException('Station worker not found');
+    }
+    if (workerId === 998) {
+      throw new BadRequestException('Target user is not a station worker');
+    }
+    return { id: String(workerId), role: 'STATION_WORKER', stationId: 1 };
+  }
+
+  async updateStationWorker(_managerId: number, workerId: number) {
+    if (workerId === 999) {
+      throw new NotFoundException('Station worker not found');
+    }
+    if (workerId === 998) {
+      throw new BadRequestException('Target user is not a station worker');
+    }
+    return { id: String(workerId), firstName: 'Updated' };
+  }
+
+  async updateStationWorkerStatus(
+    _managerId: number,
+    workerId: number,
+    dto: { isActive: boolean },
+  ) {
+    if (workerId === 999) {
+      throw new NotFoundException('Station worker not found');
+    }
+    return { id: String(workerId), isActive: dto.isActive };
+  }
+
+  async getLiveQueue() {
+    return [{ bookingId: 1, queuePosition: 1, status: 'ACTIVE' }];
+  }
+
+  async setQueueIntakePaused(_managerId: number, paused: boolean) {
+    return { id: 1, queueIntakePaused: paused };
+  }
+
+  async updateFuelStatus(_managerId: number, dto: { fuelStatus: string }) {
+    return { id: 1, fuelStatus: dto.fuelStatus };
+  }
+
+  async listTransactions() {
+    return [{ transactionId: 1, queueBookingId: 1 }];
+  }
+
+  async getDailyTotals() {
+    return { date: '2026-04-15', completedTransactionCount: 0 };
+  }
+
+  async getServiceActivity() {
+    return [{ stationWorker: { id: 10 }, completedTransactionCount: 0 }];
+  }
 }
 
 describe('StationManagerController (e2e)', () => {
@@ -113,6 +181,8 @@ describe('StationManagerController (e2e)', () => {
       })
         .overrideGuard(JwtAuthGuard)
         .useClass(MockStationManagerJwtGuard)
+        .overrideProvider(StationManagerService)
+        .useClass(MockStationManagerService)
         .compile();
 
       app = moduleFixture.createNestApplication();
@@ -137,6 +207,151 @@ describe('StationManagerController (e2e)', () => {
         .expect((res) => {
           expect([201, 500]).toContain(res.status);
         });
+    });
+
+    it('GET /station-manager/users/station-workers returns 200', () => {
+      return request(app.getHttpServer())
+        .get('/station-manager/users/station-workers')
+        .set('Authorization', 'Bearer fake-token')
+        .expect(200);
+    });
+
+    it('GET /station-manager/users/station-workers/:id returns 200', () => {
+      return request(app.getHttpServer())
+        .get('/station-manager/users/station-workers/10')
+        .set('Authorization', 'Bearer fake-token')
+        .expect(200);
+    });
+
+    it('GET /station-manager/users/station-workers/:id returns 404 for missing worker', () => {
+      return request(app.getHttpServer())
+        .get('/station-manager/users/station-workers/999')
+        .set('Authorization', 'Bearer fake-token')
+        .expect(404);
+    });
+
+    it('PATCH /station-manager/users/station-workers/:id rejects invalid payload', () => {
+      return request(app.getHttpServer())
+        .patch('/station-manager/users/station-workers/10')
+        .set('Authorization', 'Bearer fake-token')
+        .send({
+          password: '123',
+          isActive: false,
+        })
+        .expect(400);
+    });
+
+    it('PATCH /station-manager/users/station-workers/:id returns 400 for non-worker target', () => {
+      return request(app.getHttpServer())
+        .patch('/station-manager/users/station-workers/998')
+        .set('Authorization', 'Bearer fake-token')
+        .send({
+          firstName: 'Fuel',
+        })
+        .expect(400);
+    });
+
+    it('PATCH /station-manager/users/station-workers/:id returns 404 for different-station target', () => {
+      return request(app.getHttpServer())
+        .patch('/station-manager/users/station-workers/999')
+        .set('Authorization', 'Bearer fake-token')
+        .send({
+          firstName: 'Fuel',
+        })
+        .expect(404);
+    });
+
+    it('PATCH /station-manager/users/station-workers/:id returns 200', () => {
+      return request(app.getHttpServer())
+        .patch('/station-manager/users/station-workers/10')
+        .set('Authorization', 'Bearer fake-token')
+        .send({
+          firstName: 'Fuel',
+          lastName: 'Worker',
+          email: 'worker@test.local',
+          password: 'secret123',
+        })
+        .expect(200);
+    });
+
+    it('PATCH /station-manager/users/station-workers/:id/status returns 200', () => {
+      return request(app.getHttpServer())
+        .patch('/station-manager/users/station-workers/10/status')
+        .set('Authorization', 'Bearer fake-token')
+        .send({
+          isActive: false,
+        })
+        .expect(200);
+    });
+
+    it('GET /station-manager/queue/live returns 200', () => {
+      return request(app.getHttpServer())
+        .get('/station-manager/queue/live')
+        .set('Authorization', 'Bearer fake-token')
+        .expect(200);
+    });
+
+    it('PATCH /station-manager/queue/intake/pause returns 200', () => {
+      return request(app.getHttpServer())
+        .patch('/station-manager/queue/intake/pause')
+        .set('Authorization', 'Bearer fake-token')
+        .expect(200);
+    });
+
+    it('PATCH /station-manager/queue/intake/resume returns 200', () => {
+      return request(app.getHttpServer())
+        .patch('/station-manager/queue/intake/resume')
+        .set('Authorization', 'Bearer fake-token')
+        .expect(200);
+    });
+
+    it('PATCH /station-manager/station/fuel-status returns 200', () => {
+      return request(app.getHttpServer())
+        .patch('/station-manager/station/fuel-status')
+        .set('Authorization', 'Bearer fake-token')
+        .send({
+          fuelStatus: 'LIMITED',
+        })
+        .expect(200);
+    });
+
+    it('GET /station-manager/transactions rejects invalid date filters', () => {
+      return request(app.getHttpServer())
+        .get('/station-manager/transactions?from=bad-date')
+        .set('Authorization', 'Bearer fake-token')
+        .expect(400);
+    });
+
+    it('GET /station-manager/transactions returns 200', () => {
+      return request(app.getHttpServer())
+        .get(
+          '/station-manager/transactions?from=2026-04-15T00:00:00.000Z&to=2026-04-15T23:59:59.999Z',
+        )
+        .set('Authorization', 'Bearer fake-token')
+        .expect(200);
+    });
+
+    it('GET /station-manager/reports/daily-totals rejects invalid date format', () => {
+      return request(app.getHttpServer())
+        .get('/station-manager/reports/daily-totals?date=15-04-2026')
+        .set('Authorization', 'Bearer fake-token')
+        .expect(400);
+    });
+
+    it('GET /station-manager/reports/daily-totals returns 200', () => {
+      return request(app.getHttpServer())
+        .get('/station-manager/reports/daily-totals?date=2026-04-15')
+        .set('Authorization', 'Bearer fake-token')
+        .expect(200);
+    });
+
+    it('GET /station-manager/reports/service-activity returns 200', () => {
+      return request(app.getHttpServer())
+        .get(
+          '/station-manager/reports/service-activity?from=2026-04-15T00:00:00.000Z&to=2026-04-15T23:59:59.999Z',
+        )
+        .set('Authorization', 'Bearer fake-token')
+        .expect(200);
     });
   });
 });

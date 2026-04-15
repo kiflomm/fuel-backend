@@ -4,7 +4,11 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Param,
+  ParseIntPipe,
+  Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -23,6 +27,12 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
 import { StationManagerService } from './station-manager.service';
 import { CreateStationWorkerDto } from './dto/create-station-worker.dto';
+import { UpdateStationWorkerDto } from './dto/update-station-worker.dto';
+import { UpdateStationWorkerStatusDto } from './dto/update-station-worker-status.dto';
+import { UpdateStationFuelStatusDto } from './dto/update-station-fuel-status.dto';
+import { ListStationTransactionsQueryDto } from './dto/list-station-transactions-query.dto';
+import { DailyTotalsQueryDto } from './dto/daily-totals-query.dto';
+import { ServiceActivityQueryDto } from './dto/service-activity-query.dto';
 
 @ApiTags('Station Manager')
 @ApiBearerAuth('JWT-auth')
@@ -58,6 +68,186 @@ export class StationManagerController {
     return {
       success: true,
       message: 'Station worker created',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Get('users/station-workers')
+  @ApiOperation({ summary: 'List station worker accounts for your station' })
+  @ApiOkResponse({ description: 'Station workers retrieved' })
+  async listStationWorkers(@CurrentUser() user: CurrentUserPayload) {
+    const data = await this.stationManagerService.listStationWorkers(user.id);
+    return {
+      success: true,
+      message: 'Station workers retrieved',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Get('users/station-workers/:id')
+  @ApiOperation({ summary: 'Get a station worker account for your station' })
+  @ApiOkResponse({ description: 'Station worker retrieved' })
+  async getStationWorker(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    const data = await this.stationManagerService.getStationWorker(user.id, id);
+    return {
+      success: true,
+      message: 'Station worker retrieved',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Patch('users/station-workers/:id')
+  @ApiOperation({ summary: 'Update a station worker account for your station' })
+  @ApiOkResponse({ description: 'Station worker updated' })
+  async updateStationWorker(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateStationWorkerDto,
+  ) {
+    const data = await this.stationManagerService.updateStationWorker(
+      user.id,
+      id,
+      dto,
+    );
+    return {
+      success: true,
+      message: 'Station worker updated',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Patch('users/station-workers/:id/status')
+  @ApiOperation({ summary: 'Activate or suspend a station worker account' })
+  @ApiOkResponse({ description: 'Station worker status updated' })
+  async updateStationWorkerStatus(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateStationWorkerStatusDto,
+  ) {
+    const data = await this.stationManagerService.updateStationWorkerStatus(
+      user.id,
+      id,
+      dto,
+    );
+    return {
+      success: true,
+      message: 'Station worker status updated',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Get('queue/live')
+  @ApiOperation({ summary: 'View the live queue for your station' })
+  @ApiOkResponse({ description: 'Live queue retrieved' })
+  async getLiveQueue(@CurrentUser() user: CurrentUserPayload) {
+    const data = await this.stationManagerService.getLiveQueue(user.id);
+    return {
+      success: true,
+      message: 'Live queue retrieved',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Patch('queue/intake/pause')
+  @ApiOperation({ summary: 'Pause queue intake for your station' })
+  @ApiOkResponse({ description: 'Queue intake paused' })
+  async pauseQueueIntake(@CurrentUser() user: CurrentUserPayload) {
+    const data = await this.stationManagerService.setQueueIntakePaused(
+      user.id,
+      true,
+    );
+    return {
+      success: true,
+      message: 'Queue intake paused',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Patch('queue/intake/resume')
+  @ApiOperation({ summary: 'Resume queue intake for your station' })
+  @ApiOkResponse({ description: 'Queue intake resumed' })
+  async resumeQueueIntake(@CurrentUser() user: CurrentUserPayload) {
+    const data = await this.stationManagerService.setQueueIntakePaused(
+      user.id,
+      false,
+    );
+    return {
+      success: true,
+      message: 'Queue intake resumed',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Patch('station/fuel-status')
+  @ApiOperation({ summary: 'Update fuel availability status for your station' })
+  @ApiOkResponse({ description: 'Station fuel status updated' })
+  async updateFuelStatus(
+    @CurrentUser() user: CurrentUserPayload,
+    @Body() dto: UpdateStationFuelStatusDto,
+  ) {
+    const data = await this.stationManagerService.updateFuelStatus(user.id, dto);
+    return {
+      success: true,
+      message: 'Station fuel status updated',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Get('transactions')
+  @ApiOperation({ summary: 'View transaction history for your station' })
+  @ApiOkResponse({ description: 'Station transactions retrieved' })
+  async listTransactions(
+    @CurrentUser() user: CurrentUserPayload,
+    @Query() query: ListStationTransactionsQueryDto,
+  ) {
+    const data = await this.stationManagerService.listTransactions(user.id, query);
+    return {
+      success: true,
+      message: 'Station transactions retrieved',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Get('reports/daily-totals')
+  @ApiOperation({ summary: 'View daily station totals' })
+  @ApiOkResponse({ description: 'Daily station totals retrieved' })
+  async getDailyTotals(
+    @CurrentUser() user: CurrentUserPayload,
+    @Query() query: DailyTotalsQueryDto,
+  ) {
+    const data = await this.stationManagerService.getDailyTotals(user.id, query);
+    return {
+      success: true,
+      message: 'Daily station totals retrieved',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Get('reports/service-activity')
+  @ApiOperation({ summary: 'View service activity for your station' })
+  @ApiOkResponse({ description: 'Service activity retrieved' })
+  async getServiceActivity(
+    @CurrentUser() user: CurrentUserPayload,
+    @Query() query: ServiceActivityQueryDto,
+  ) {
+    const data = await this.stationManagerService.getServiceActivity(user.id, query);
+    return {
+      success: true,
+      message: 'Service activity retrieved',
       data,
       timestamp: new Date().toISOString(),
     };
