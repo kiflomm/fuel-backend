@@ -12,7 +12,6 @@ import cookieParser from 'cookie-parser';
 import { AppModule } from '../src/app.module';
 import { JwtAuthGuard } from '../src/auth/guards/jwt-auth.guard';
 
-/** Simulates a logged-in vehicle owner so `RolesGuard` can return 403 on admin routes. */
 @Injectable()
 class MockVehicleOwnerJwtGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
@@ -38,7 +37,7 @@ function configureApp(app: INestApplication) {
   );
 }
 
-describe('AdminController (e2e)', () => {
+describe('StationManagerController (e2e)', () => {
   describe('without JWT', () => {
     let app: INestApplication<App>;
 
@@ -56,14 +55,14 @@ describe('AdminController (e2e)', () => {
       await app.close();
     });
 
-    it('GET /admin/health returns 401 without Authorization', () => {
+    it('GET /station-manager/health returns 401 without Authorization', () => {
       return request(app.getHttpServer())
-        .get('/admin/health')
+        .get('/station-manager/health')
         .expect(401);
     });
   });
 
-  describe('non-admin JWT (simulated)', () => {
+  describe('non-station-manager JWT (simulated)', () => {
     let app: INestApplication<App>;
 
     beforeAll(async () => {
@@ -83,36 +82,37 @@ describe('AdminController (e2e)', () => {
       await app.close();
     });
 
-    it('GET /admin/health returns 403 for non-GOVERNMENT_ADMIN', () => {
+    it('GET /station-manager/health returns 403 for non-STATION_MANAGER', () => {
       return request(app.getHttpServer())
-        .get('/admin/health')
+        .get('/station-manager/health')
         .set('Authorization', 'Bearer fake-token')
         .expect(403);
     });
   });
 
-  describe('fuel price management (route-level)', () => {
+  describe('station worker creation (route-level)', () => {
     let app: INestApplication<App>;
+
+    @Injectable()
+    class MockStationManagerJwtGuard implements CanActivate {
+      canActivate(context: ExecutionContext): boolean {
+        const req = context.switchToHttp().getRequest();
+        req.user = {
+          id: 2,
+          email: 'manager@test.local',
+          role: 'STATION_MANAGER',
+          stationId: 1,
+        };
+        return true;
+      }
+    }
 
     beforeAll(async () => {
       const moduleFixture: TestingModule = await Test.createTestingModule({
         imports: [AppModule],
       })
         .overrideGuard(JwtAuthGuard)
-        .useClass(
-          class MockGovernmentAdminJwtGuard implements CanActivate {
-            canActivate(context: ExecutionContext): boolean {
-              const req = context.switchToHttp().getRequest();
-              req.user = {
-                id: 1,
-                email: 'admin@test.local',
-                role: 'GOVERNMENT_ADMIN',
-                stationId: null,
-              };
-              return true;
-            }
-          },
-        )
+        .useClass(MockStationManagerJwtGuard)
         .compile();
 
       app = moduleFixture.createNestApplication();
@@ -124,36 +124,18 @@ describe('AdminController (e2e)', () => {
       await app.close();
     });
 
-    it('POST /admin/fuel-prices returns 201 (auth/validation wired)', () => {
+    it('POST /station-manager/users/station-workers returns 201 (auth/validation wired)', () => {
       return request(app.getHttpServer())
-        .post('/admin/fuel-prices')
+        .post('/station-manager/users/station-workers')
         .set('Authorization', 'Bearer fake-token')
         .send({
-          fuelType: 'DIESEL',
-          pricePerLiter: 100,
-          isActive: true,
+          email: 'worker@test.local',
+          password: 'secret123',
+          firstName: 'Fuel',
+          lastName: 'Worker',
         })
-        // DB may be missing in CI; this test mainly ensures route exists + DTO validation passes.
         .expect((res) => {
           expect([201, 500]).toContain(res.status);
-        });
-    });
-
-    it('GET /admin/stations returns 200 (auth/route wired)', () => {
-      return request(app.getHttpServer())
-        .get('/admin/stations')
-        .set('Authorization', 'Bearer fake-token')
-        .expect((res) => {
-          expect([200, 500]).toContain(res.status);
-        });
-    });
-
-    it('GET /admin/users returns 200 (auth/route wired)', () => {
-      return request(app.getHttpServer())
-        .get('/admin/users')
-        .set('Authorization', 'Bearer fake-token')
-        .expect((res) => {
-          expect([200, 500]).toContain(res.status);
         });
     });
   });

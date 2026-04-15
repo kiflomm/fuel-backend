@@ -84,6 +84,32 @@ export class AdminController {
     };
   }
 
+  @Get('stations')
+  @ApiOperation({ summary: 'List fuel stations' })
+  @ApiOkResponse({ description: 'Stations retrieved' })
+  async listStations() {
+    const data = await this.adminService.listStations();
+    return {
+      success: true,
+      message: 'Stations retrieved',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Get('stations/:id')
+  @ApiOperation({ summary: 'Get a fuel station by id' })
+  @ApiOkResponse({ description: 'Station retrieved' })
+  async getStation(@Param('id', ParseIntPipe) id: number) {
+    const data = await this.adminService.getStationById(id);
+    return {
+      success: true,
+      message: 'Station retrieved',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
   @Post('users/station-managers')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a station manager account' })
@@ -109,6 +135,32 @@ export class AdminController {
     return {
       success: true,
       message: 'Vehicle owner created',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Get('users')
+  @ApiOperation({ summary: 'List users' })
+  @ApiOkResponse({ description: 'Users retrieved' })
+  async listUsers() {
+    const data = await this.adminService.listUsers();
+    return {
+      success: true,
+      message: 'Users retrieved',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Get('users/:id')
+  @ApiOperation({ summary: 'Get a user by id' })
+  @ApiOkResponse({ description: 'User retrieved' })
+  async getUser(@Param('id', ParseIntPipe) id: number) {
+    const data = await this.adminService.getUserById(id);
+    return {
+      success: true,
+      message: 'User retrieved',
       data,
       timestamp: new Date().toISOString(),
     };

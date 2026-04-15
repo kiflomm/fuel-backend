@@ -66,6 +66,18 @@ export class AdminService {
     };
   }
 
+  private mapVehicle(row: typeof schema.vehicles.$inferSelect) {
+    return {
+      id: row.id,
+      plateNumber: row.plateNumber,
+      category: row.category,
+      label: row.label,
+      isActive: row.isActive,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    };
+  }
+
   async createStation(dto: CreateStationDto) {
     try {
       const [row] = await this.db
@@ -115,6 +127,33 @@ export class AdminService {
       .where(eq(schema.stations.id, id))
       .returning();
     return this.mapStation(row);
+  }
+
+  async listStations() {
+    const rows = await this.db.select().from(schema.stations);
+    return rows.map((row) => this.mapStation(row));
+  }
+
+  async getStationById(id: number) {
+    const [station] = await this.db
+      .select()
+      .from(schema.stations)
+      .where(eq(schema.stations.id, id))
+      .limit(1);
+
+    if (!station) {
+      throw new NotFoundException('Station not found');
+    }
+
+    const users = await this.db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.stationId, id));
+
+    return {
+      ...this.mapStation(station),
+      users: users.map((user) => this.mapUser(user)),
+    };
   }
 
   async createStationManager(dto: CreateStationManagerDto) {
@@ -191,15 +230,7 @@ export class AdminService {
 
         return {
           user: this.mapUser(user),
-          vehicles: vehicleRows.map((v) => ({
-            id: v.id,
-            plateNumber: v.plateNumber,
-            category: v.category,
-            label: v.label,
-            isActive: v.isActive,
-            createdAt: v.createdAt.toISOString(),
-            updatedAt: v.updatedAt.toISOString(),
-          })),
+          vehicles: vehicleRows.map((v) => this.mapVehicle(v)),
         };
       });
     } catch (e) {
@@ -241,6 +272,53 @@ export class AdminService {
       .where(eq(schema.users.id, targetUserId))
       .returning();
     return this.mapUser(updated!);
+  }
+
+  async listUsers() {
+    const rows = await this.db.select().from(schema.users);
+    return rows.map((row) => this.mapUser(row));
+  }
+
+  async getUserById(id: number) {
+    const [user] = await this.db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.id, id))
+      .limit(1);
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const station =
+      user.stationId != null
+        ? await this.db
+            .select()
+            .from(schema.stations)
+            .where(eq(schema.stations.id, user.stationId))
+            .limit(1)
+        : [];
+
+    const vehicles =
+      user.role === 'VEHICLE_OWNER'
+        ? await this.db
+            .select()
+            .from(schema.vehicles)
+            .where(eq(schema.vehicles.ownerUserId, user.id))
+        : [];
+
+    return {
+      ...this.mapUser(user),
+      station: station[0]
+        ? {
+            id: station[0].id,
+            name: station[0].name,
+            city: station[0].city,
+            isActive: station[0].isActive,
+          }
+        : null,
+      vehicles: vehicles.map((vehicle) => this.mapVehicle(vehicle)),
+    };
   }
 
   async upsertFuelPrice(dto: UpsertFuelPriceDto) {
