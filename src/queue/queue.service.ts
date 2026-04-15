@@ -74,6 +74,22 @@ export class QueueService {
     }));
   }
 
+  async listFuelPrices() {
+    const rows = await this.db
+      .select()
+      .from(schema.fuelPrices)
+      .where(eq(schema.fuelPrices.isActive, true));
+
+    return rows.map((row) => ({
+      id: row.id,
+      fuelType: row.fuelType,
+      pricePerLiter: row.pricePerLiter,
+      isActive: row.isActive,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    }));
+  }
+
   async initiatePayment(ownerUserId: number, dto: InitiatePaymentDto) {
     const [vehicle] = await this.db
       .select()
@@ -364,7 +380,7 @@ export class QueueService {
       );
 
       // Deduct quota at join time (payment has already succeeded).
-      await this.quotaService.deductDailyQuota(
+      await this.quotaService.deductQuota(
         tx,
         payment.vehicleId,
         String(payment.litersRequested),

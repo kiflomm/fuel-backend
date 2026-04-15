@@ -8,7 +8,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DrizzleAsyncProvider } from '../database/drizzle.provider';
 import { Inject } from '@nestjs/common';
 import * as schema from '../database/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq, SQL } from 'drizzle-orm';
 import * as bcrypt from 'bcrypt';
 import { CreateStationDto } from './dto/create-station.dto';
 import { UpdateStationDto } from './dto/update-station.dto';
@@ -16,6 +16,9 @@ import { CreateStationManagerDto } from './dto/create-station-manager.dto';
 import { CreateVehicleOwnerDto } from './dto/create-vehicle-owner.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { UpsertFuelPriceDto } from './dto/upsert-fuel-price.dto';
+import { CreateQuotaRuleDto } from './dto/create-quota-rule.dto';
+import { ListQuotaRulesDto } from './dto/list-quota-rules.dto';
+import { UpdateQuotaRuleDto } from './dto/update-quota-rule.dto';
 
 function isPgUniqueViolation(error: unknown): boolean {
   return (
@@ -72,6 +75,18 @@ export class AdminService {
       plateNumber: row.plateNumber,
       category: row.category,
       label: row.label,
+      isActive: row.isActive,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    };
+  }
+
+  private mapQuotaRule(row: typeof schema.quotaRules.$inferSelect) {
+    return {
+      id: row.id,
+      vehicleCategory: row.vehicleCategory,
+      period: row.period,
+      litersLimit: row.litersLimit,
       isActive: row.isActive,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
@@ -387,5 +402,115 @@ export class AdminService {
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     }));
+  }
+
+  async createQuotaRule(dto: CreateQuotaRuleDto) {
+    const [existing] = await this.db
+      .select()
+      .from(schema.quotaRules)
+      .where(
+        and(
+          eq(schema.quotaRules.vehicleCategory, dto.vehicleCategory),
+          eq(schema.quotaRules.period, dto.period),
+        ),
+      )
+      .limit(1);
+
+    if (existing) {
+      throw new ConflictException(
+        'A quota rule already exists for this vehicle category and period',
+      );
+    }
+
+    const [row] = await this.db
+      .insert(schema.quotaRules)
+      .values({
+        vehicleCategory: dto.vehicleCategory,
+        period: dto.period,
+        litersLimit: dto.litersLimit.toFixed(2),
+        isActive: dto.isActive ?? true,
+      })
+      .returning();
+
+    return this.mapQuotaRule(row);
+  }
+
+  async listQuotaRules(query: ListQuotaRulesDto) {
+    const conditions: SQL<unknown>[] = [];
+    if (query.vehicleCategory !== undefined) {
+      conditions.push(
+        eq(schema.quotaRules.vehicleCategory, query.vehicleCategory),
+      );
+    }
+    if (query.period !== undefined) {
+      conditions.push(eq(schema.quotaRules.period, query.period));
+    }
+    if (query.isActive !== undefined) {
+      conditions.push(eq(schema.quotaRules.isActive, query.isActive));
+    }
+
+    const rows = await this.db
+      .select()
+      .from(schema.quotaRules)
+      .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+    return rows.map((row) => this.mapQuotaRule(row));
+  }
+
+  async getQuotaRuleById(id: number) {
+    const [row] = await this.db
+      .select()
+      .from(schema.quotaRules)
+      .where(eq(schema.quotaRules.id, id))
+      .limit(1);
+
+    if (!row) {
+      throw new NotFoundException('Quota rule not found');
+    }
+
+    return this.mapQuotaRule(row);
+  }
+
+  async updateQuotaRule(id: number, dto: UpdateQuotaRuleDto) {
+    const [existing] = await this.db
+      .select()
+      .from(schema.quotaRules)
+      .where(eq(schema.quotaRules.id, id))
+      .limit(1);
+
+    if (!existing) {
+      throw new NotFoundException('Quota rule not found');
+    }
+
+    const patch: Partial<typeof schema.quotaRules.$inferInsert> = {
+      updatedAt: new Date(),
+    };
+    if (dto.litersLimit !== undefined) {
+      patch.litersLimit = dto.litersLimit.toFixed(2);
+    }
+    if (dto.isActive !== undefined) {
+      patch.isActive = dto.isActive;
+    }
+
+    const [row] = await this.db
+      .update(schema.quotaRules)
+      .set(patch)
+      .where(eq(schema.quotaRules.id, id))
+      .returning();
+
+    return this.mapQuotaRule(row);
+  }
+
+  async deleteQuotaRule(id: number) {
+    const [row] = await this.db
+      .delete(schema.quotaRules)
+      .where(eq(schema.quotaRules.id, id))
+      .returning();
+
+    if (!row) {
+      throw new NotFoundException('Quota rule not found');
+    }
+
+    return this.mapQuotaRule(row);
   }
 }

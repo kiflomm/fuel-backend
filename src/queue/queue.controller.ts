@@ -51,6 +51,21 @@ export class QueueController {
     };
   }
 
+  @Get('fuel-prices')
+  @ApiOperation({
+    summary: 'List active fuel prices before payment initiation',
+  })
+  @ApiOkResponse({ description: 'Fuel prices retrieved' })
+  async listFuelPrices() {
+    const data = await this.queueService.listFuelPrices();
+    return {
+      success: true,
+      message: 'Fuel prices retrieved',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
   @Post('payments/initiate')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Start Chapa payment before joining a queue' })

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -8,6 +9,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -31,6 +33,9 @@ import { CreateStationManagerDto } from './dto/create-station-manager.dto';
 import { CreateVehicleOwnerDto } from './dto/create-vehicle-owner.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { UpsertFuelPriceDto } from './dto/upsert-fuel-price.dto';
+import { CreateQuotaRuleDto } from './dto/create-quota-rule.dto';
+import { UpdateQuotaRuleDto } from './dto/update-quota-rule.dto';
+import { ListQuotaRulesDto } from './dto/list-quota-rules.dto';
 
 @ApiTags('Admin')
 @ApiBearerAuth('JWT-auth')
@@ -205,6 +210,75 @@ export class AdminController {
     return {
       success: true,
       message: 'Fuel prices retrieved',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Post('quota-rules')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Create a quota rule for a vehicle category and period' })
+  @ApiCreatedResponse({ description: 'Quota rule created' })
+  async createQuotaRule(@Body() dto: CreateQuotaRuleDto) {
+    const data = await this.adminService.createQuotaRule(dto);
+    return {
+      success: true,
+      message: 'Quota rule created',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Get('quota-rules')
+  @ApiOperation({ summary: 'List quota rules' })
+  @ApiOkResponse({ description: 'Quota rules retrieved' })
+  async listQuotaRules(@Query() query: ListQuotaRulesDto) {
+    const data = await this.adminService.listQuotaRules(query);
+    return {
+      success: true,
+      message: 'Quota rules retrieved',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Get('quota-rules/:id')
+  @ApiOperation({ summary: 'Get a quota rule by id' })
+  @ApiOkResponse({ description: 'Quota rule retrieved' })
+  async getQuotaRule(@Param('id', ParseIntPipe) id: number) {
+    const data = await this.adminService.getQuotaRuleById(id);
+    return {
+      success: true,
+      message: 'Quota rule retrieved',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Patch('quota-rules/:id')
+  @ApiOperation({ summary: 'Update a quota rule' })
+  @ApiOkResponse({ description: 'Quota rule updated' })
+  async updateQuotaRule(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateQuotaRuleDto,
+  ) {
+    const data = await this.adminService.updateQuotaRule(id, dto);
+    return {
+      success: true,
+      message: 'Quota rule updated',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Delete('quota-rules/:id')
+  @ApiOperation({ summary: 'Delete a quota rule' })
+  @ApiOkResponse({ description: 'Quota rule deleted' })
+  async deleteQuotaRule(@Param('id', ParseIntPipe) id: number) {
+    const data = await this.adminService.deleteQuotaRule(id);
+    return {
+      success: true,
+      message: 'Quota rule deleted',
       data,
       timestamp: new Date().toISOString(),
     };
