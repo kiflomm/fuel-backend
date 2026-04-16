@@ -15,22 +15,11 @@ import { randomBytes } from 'crypto';
 import { ChapaService } from '../payment/chapa.service';
 import { QuotaService } from './quota.service';
 import { InitiatePaymentDto } from './dto/initiate-payment.dto';
-
-function isChapaVerifySuccess(response: unknown): boolean {
-  if (!response || typeof response !== 'object') {
-    return false;
-  }
-  const r = response as Record<string, unknown>;
-  const top = String(r.status ?? '').toLowerCase() === 'success';
-  const data = r.data;
-  if (data && typeof data === 'object') {
-    const d = data as Record<string, unknown>;
-    if (String(d.status ?? '').toLowerCase() === 'success') {
-      return true;
-    }
-  }
-  return top;
-}
+import {
+  extractChapaVerifiedFields,
+  isChapaVerifySuccess,
+  normalizeMoney2,
+} from '../payment/chapa-verify.util';
 
 @Injectable()
 export class QueueService {
@@ -279,8 +268,19 @@ export class QueueService {
 
     const raw = await this.chapaService.verifyTransaction(txRef);
     const ok = isChapaVerifySuccess(raw);
+    const fields = extractChapaVerifiedFields(raw);
 
-    if (!ok) {
+    const expectedAmount = normalizeMoney2(payment.amount);
+    const gotAmount = normalizeMoney2(fields.amount);
+    const expectedCurrency = String(payment.currency ?? '').toUpperCase();
+    const gotCurrency = String(fields.currency ?? '').toUpperCase();
+
+    const mismatches: string[] = [];
+    if (fields.txRef && fields.txRef !== payment.txRef) mismatches.push('tx_ref');
+    if (expectedAmount && gotAmount && expectedAmount !== gotAmount) mismatches.push('amount');
+    if (expectedCurrency && gotCurrency && expectedCurrency !== gotCurrency) mismatches.push('currency');
+
+    if (!ok || mismatches.length > 0) {
       await this.db
         .update(schema.payments)
         .set({
@@ -289,6 +289,11 @@ export class QueueService {
           providerRaw: raw as Record<string, unknown>,
         })
         .where(eq(schema.payments.id, payment.id));
+      if (mismatches.length > 0) {
+        throw new BadRequestException(
+          `Payment verification mismatch: ${mismatches.join(', ')}`,
+        );
+      }
       throw new BadRequestException('Payment was not successful');
     }
 

@@ -81,7 +81,7 @@ export class ChapaService {
     this.secretKey = this.configService.get<string>('CHAPA_SECRET_KEY') || '';
     this.callbackUrl =
       this.configService.get<string>('CHAPA_CALLBACK_URL') ||
-      `${this.configService.get<string>('APP_URL') || 'http://localhost:3000'}/api/v1/payments/webhook/chapa`;
+      `${this.configService.get<string>('SERVER_URL') || 'http://localhost:3000'}/payments/webhook/chapa`;
     this.returnUrl =
       this.configService.get<string>('CHAPA_RETURN_URL') ||
       `${this.configService.get<string>('APP_URL') || 'http://localhost:3001'}/payment-success`;
