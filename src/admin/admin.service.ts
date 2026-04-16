@@ -21,6 +21,7 @@ import { ListQuotaRulesDto } from './dto/list-quota-rules.dto';
 import { UpdateQuotaRuleDto } from './dto/update-quota-rule.dto';
 import { AdminDailyTotalsQueryDto } from './dto/admin-daily-totals-query.dto';
 import { AdminServiceActivityQueryDto } from './dto/admin-service-activity-query.dto';
+import { AdminDistributionQueryDto } from './dto/admin-distribution-query.dto';
 import { desc, gte, inArray, lte } from 'drizzle-orm';
 
 function isPgUniqueViolation(error: unknown): boolean {
@@ -532,6 +533,165 @@ export class AdminService {
     }
 
     return { fromDate, toDate };
+  }
+
+  async getDistributionReport(query: AdminDistributionQueryDto) {
+    const { fromDate, toDate } = this.normalizeDateRange(query.from, query.to);
+
+    const conditions: SQL<unknown>[] = [];
+    if (query.stationId !== undefined) {
+      conditions.push(eq(schema.transactions.stationId, query.stationId));
+    }
+    if (fromDate) conditions.push(gte(schema.transactions.servedAt, fromDate));
+    if (toDate) conditions.push(lte(schema.transactions.servedAt, toDate));
+
+    const txns = await this.db
+      .select()
+      .from(schema.transactions)
+      .where(conditions.length ? and(...conditions) : undefined);
+
+    const stationIds = [...new Set(txns.map((t) => t.stationId))];
+    const vehicleIds = [...new Set(txns.map((t) => t.vehicleId))];
+    const paymentIds = [...new Set(txns.map((t) => t.paymentId))];
+
+    const stations: Array<typeof schema.stations.$inferSelect> = stationIds.length
+      ? await this.db
+          .select()
+          .from(schema.stations)
+          .where(inArray(schema.stations.id, stationIds))
+      : [];
+
+    const vehicles: Array<typeof schema.vehicles.$inferSelect> = vehicleIds.length
+      ? await this.db
+          .select()
+          .from(schema.vehicles)
+          .where(inArray(schema.vehicles.id, vehicleIds))
+      : [];
+
+    const payments: Array<typeof schema.payments.$inferSelect> = paymentIds.length
+      ? await this.db
+          .select()
+          .from(schema.payments)
+          .where(inArray(schema.payments.id, paymentIds))
+      : [];
+
+    const stationMap = new Map<number, typeof schema.stations.$inferSelect>(
+      stations.map((s) => [s.id, s] as const),
+    );
+    const vehicleMap = new Map<number, typeof schema.vehicles.$inferSelect>(
+      vehicles.map((v) => [v.id, v] as const),
+    );
+    const paymentMap = new Map<number, typeof schema.payments.$inferSelect>(
+      payments.map((p) => [p.id, p] as const),
+    );
+
+    const totalsOverall = {
+      completedTransactionCount: 0,
+      totalLitersDispensed: 0,
+      totalGrossAmount: 0,
+      uniqueVehicleIds: new Set<number>(),
+    };
+
+    type Bucket = {
+      completedTransactionCount: number;
+      totalLitersDispensed: number;
+      totalGrossAmount: number;
+      uniqueVehicleIds: Set<number>;
+    };
+
+    const byStation = new Map<number, Bucket>();
+    const byVehicleCategory = new Map<string, Bucket>();
+    const byFuelType = new Map<string, Bucket>();
+
+    const getBucket = (map: Map<any, Bucket>, key: any): Bucket => {
+      const existing = map.get(key);
+      if (existing) return existing;
+      const b: Bucket = {
+        completedTransactionCount: 0,
+        totalLitersDispensed: 0,
+        totalGrossAmount: 0,
+        uniqueVehicleIds: new Set<number>(),
+      };
+      map.set(key, b);
+      return b;
+    };
+
+    for (const txn of txns) {
+      const payment = paymentMap.get(txn.paymentId) ?? null;
+      const vehicle = vehicleMap.get(txn.vehicleId) ?? null;
+
+      const liters = Number(txn.litersDispensed);
+      const amount = Number(payment?.amount ?? 0);
+      const fuelType = String(payment?.fuelType ?? 'UNKNOWN');
+      const category = String(vehicle?.category ?? 'UNKNOWN');
+
+      totalsOverall.completedTransactionCount += 1;
+      totalsOverall.totalLitersDispensed += Number.isFinite(liters) ? liters : 0;
+      totalsOverall.totalGrossAmount += Number.isFinite(amount) ? amount : 0;
+      totalsOverall.uniqueVehicleIds.add(txn.vehicleId);
+
+      const stationBucket = getBucket(byStation, txn.stationId);
+      stationBucket.completedTransactionCount += 1;
+      stationBucket.totalLitersDispensed += Number.isFinite(liters) ? liters : 0;
+      stationBucket.totalGrossAmount += Number.isFinite(amount) ? amount : 0;
+      stationBucket.uniqueVehicleIds.add(txn.vehicleId);
+
+      const catBucket = getBucket(byVehicleCategory, category);
+      catBucket.completedTransactionCount += 1;
+      catBucket.totalLitersDispensed += Number.isFinite(liters) ? liters : 0;
+      catBucket.totalGrossAmount += Number.isFinite(amount) ? amount : 0;
+      catBucket.uniqueVehicleIds.add(txn.vehicleId);
+
+      const fuelBucket = getBucket(byFuelType, fuelType);
+      fuelBucket.completedTransactionCount += 1;
+      fuelBucket.totalLitersDispensed += Number.isFinite(liters) ? liters : 0;
+      fuelBucket.totalGrossAmount += Number.isFinite(amount) ? amount : 0;
+      fuelBucket.uniqueVehicleIds.add(txn.vehicleId);
+    }
+
+    const mapBucket = (b: Bucket) => ({
+      completedTransactionCount: b.completedTransactionCount,
+      totalLitersDispensed: b.totalLitersDispensed.toFixed(2),
+      totalGrossAmount: b.totalGrossAmount.toFixed(2),
+      uniqueVehiclesServedCount: b.uniqueVehicleIds.size,
+    });
+
+    return {
+      filters: {
+        from: fromDate ? fromDate.toISOString() : null,
+        to: toDate ? toDate.toISOString() : null,
+        stationId: query.stationId ?? null,
+      },
+      totalsOverall: {
+        completedTransactionCount: totalsOverall.completedTransactionCount,
+        totalLitersDispensed: totalsOverall.totalLitersDispensed.toFixed(2),
+        totalGrossAmount: totalsOverall.totalGrossAmount.toFixed(2),
+        uniqueVehiclesServedCount: totalsOverall.uniqueVehicleIds.size,
+      },
+      byStation: [...byStation.entries()]
+        .map(([stationId, bucket]) => {
+          const station = stationMap.get(stationId) ?? null;
+          return {
+            station: station
+              ? { id: station.id, name: station.name, city: station.city }
+              : { id: stationId, name: null, city: null },
+            ...mapBucket(bucket),
+          };
+        })
+        .sort((a, b) => Number(b.totalGrossAmount) - Number(a.totalGrossAmount)),
+      byVehicleCategory: [...byVehicleCategory.entries()]
+        .map(([vehicleCategory, bucket]) => ({
+          vehicleCategory,
+          ...mapBucket(bucket),
+        }))
+        .sort((a, b) => Number(b.totalGrossAmount) - Number(a.totalGrossAmount)),
+      byFuelType: [...byFuelType.entries()]
+        .map(([fuelType, bucket]) => ({
+          fuelType,
+          ...mapBucket(bucket),
+        }))
+        .sort((a, b) => Number(b.totalGrossAmount) - Number(a.totalGrossAmount)),
+    };
   }
 
   async getDailyTotals(query: AdminDailyTotalsQueryDto) {

@@ -38,6 +38,7 @@ import { UpdateQuotaRuleDto } from './dto/update-quota-rule.dto';
 import { ListQuotaRulesDto } from './dto/list-quota-rules.dto';
 import { AdminDailyTotalsQueryDto } from './dto/admin-daily-totals-query.dto';
 import { AdminServiceActivityQueryDto } from './dto/admin-service-activity-query.dto';
+import { AdminDistributionQueryDto } from './dto/admin-distribution-query.dto';
 
 @ApiTags('Admin')
 @ApiBearerAuth('JWT-auth')
@@ -290,7 +291,7 @@ export class AdminController {
   @ApiOperation({ summary: 'View daily system totals (optionally per-station)' })
   @ApiOkResponse({ description: 'Daily totals retrieved' })
   async getDailyTotals(@Query() query: AdminDailyTotalsQueryDto) {
-    const data = await (this.adminService as any).getDailyTotals(query);
+    const data = await this.adminService.getDailyTotals(query);
     return {
       success: true,
       message: 'Daily totals retrieved',
@@ -305,10 +306,26 @@ export class AdminController {
   })
   @ApiOkResponse({ description: 'Service activity retrieved' })
   async getServiceActivity(@Query() query: AdminServiceActivityQueryDto) {
-    const data = await (this.adminService as any).getServiceActivity(query);
+    const data = await this.adminService.getServiceActivity(query);
     return {
       success: true,
       message: 'Service activity retrieved',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Get('reports/distribution')
+  @ApiOperation({
+    summary:
+      'View fuel distribution breakdowns (by station, vehicle category, fuel type)',
+  })
+  @ApiOkResponse({ description: 'Distribution report retrieved' })
+  async getDistribution(@Query() query: AdminDistributionQueryDto) {
+    const data = await this.adminService.getDistributionReport(query);
+    return {
+      success: true,
+      message: 'Distribution report retrieved',
       data,
       timestamp: new Date().toISOString(),
     };
