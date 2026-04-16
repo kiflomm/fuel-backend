@@ -18,7 +18,6 @@ import {
   ForgotPasswordDto,
   ResetPasswordDto,
   ChangePasswordDto,
-  UpdateProfileDto,
   VerifyResetCodeDto,
 } from './dto/dto.export';
 
@@ -169,28 +168,6 @@ export class AuthController {
     return {
       success: true,
       message: 'Profile retrieved successfully',
-      data: profile,
-      timestamp: new Date().toISOString(),
-    };
-  }
-
-  @Put('profile')
-  @UseGuards(JwtAuthGuard)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Update current user profile' })
-  @ApiBearerAuth('JWT-auth')
-  @ApiBody({ type: UpdateProfileDto })
-  @ApiOkResponse({ description: 'Profile updated successfully' })
-  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
-  async updateProfile(
-    @CurrentUser() user: CurrentUserPayload,
-    @Body() updateProfileDto: UpdateProfileDto,
-  ) {
-    const profile = await this.authService.updateProfile(user.id, updateProfileDto);
-
-    return {
-      success: true,
-      message: 'Profile updated successfully',
       data: profile,
       timestamp: new Date().toISOString(),
     };

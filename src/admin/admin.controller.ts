@@ -36,6 +36,8 @@ import { UpsertFuelPriceDto } from './dto/upsert-fuel-price.dto';
 import { CreateQuotaRuleDto } from './dto/create-quota-rule.dto';
 import { UpdateQuotaRuleDto } from './dto/update-quota-rule.dto';
 import { ListQuotaRulesDto } from './dto/list-quota-rules.dto';
+import { AdminDailyTotalsQueryDto } from './dto/admin-daily-totals-query.dto';
+import { AdminServiceActivityQueryDto } from './dto/admin-service-activity-query.dto';
 
 @ApiTags('Admin')
 @ApiBearerAuth('JWT-auth')
@@ -279,6 +281,34 @@ export class AdminController {
     return {
       success: true,
       message: 'Quota rule deleted',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Get('reports/daily-totals')
+  @ApiOperation({ summary: 'View daily system totals (optionally per-station)' })
+  @ApiOkResponse({ description: 'Daily totals retrieved' })
+  async getDailyTotals(@Query() query: AdminDailyTotalsQueryDto) {
+    const data = await (this.adminService as any).getDailyTotals(query);
+    return {
+      success: true,
+      message: 'Daily totals retrieved',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Get('reports/service-activity')
+  @ApiOperation({
+    summary: 'View service activity (aggregate by station worker; optional station filter)',
+  })
+  @ApiOkResponse({ description: 'Service activity retrieved' })
+  async getServiceActivity(@Query() query: AdminServiceActivityQueryDto) {
+    const data = await (this.adminService as any).getServiceActivity(query);
+    return {
+      success: true,
+      message: 'Service activity retrieved',
       data,
       timestamp: new Date().toISOString(),
     };

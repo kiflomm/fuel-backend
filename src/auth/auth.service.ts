@@ -18,7 +18,6 @@ import {
     ForgotPasswordDto,
     ResetPasswordDto,
     ChangePasswordDto,
-    UpdateProfileDto,
   } from './dto/dto.export';
   import { randomBytes, createHash } from 'crypto';
   import { MailerService } from '../mailer/mailer.service';
@@ -163,56 +162,6 @@ import {
         isActive: user.isActive,
         createdAt: user.createdAt.toISOString(),
         updatedAt: user.updatedAt.toISOString(),
-      };
-    }
-  
-    async updateProfile(userId: number, updateProfileDto: UpdateProfileDto) {
-      const [user] = await this.db
-        .select()
-        .from(schema.users)
-        .where(eq(schema.users.id, userId))
-        .limit(1);
-  
-      if (!user) {
-        throw new NotFoundException('User not found');
-      }
-  
-      // Build update object with only provided fields
-      const updateData: Partial<{
-        firstName: string;
-        lastName: string;
-        updatedAt: Date;
-      }> = {
-        updatedAt: new Date(),
-      };
-  
-      if (updateProfileDto.firstName !== undefined) {
-        updateData.firstName = updateProfileDto.firstName;
-      }
-  
-      if (updateProfileDto.lastName !== undefined) {
-        updateData.lastName = updateProfileDto.lastName;
-      }
-  
-      // Note: phone field is not in the users table schema
-      // If you need to support phone, add it to the database schema first
-  
-      const [updatedUser] = await this.db
-        .update(schema.users)
-        .set(updateData)
-        .where(eq(schema.users.id, userId))
-        .returning();
-  
-      return {
-        id: updatedUser.id.toString(),
-        email: updatedUser.email,
-        firstName: updatedUser.firstName,
-        lastName: updatedUser.lastName,
-        role: updatedUser.role,
-        stationId: updatedUser.stationId ?? null,
-        isActive: updatedUser.isActive,
-        createdAt: updatedUser.createdAt.toISOString(),
-        updatedAt: updatedUser.updatedAt.toISOString(),
       };
     }
   

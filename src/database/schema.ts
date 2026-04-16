@@ -13,3 +13,5 @@ export * from './schema/fuel-prices';
 export * from './schema/payments';
 export * from './schema/queue-bookings';
 export * from './schema/transactions';
+export * from './schema/user-devices';
+export * from './schema/announcements';

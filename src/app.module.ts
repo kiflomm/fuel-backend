@@ -7,6 +7,8 @@ import { AuthModule } from './auth/auth.module';
 import { AdminModule } from './admin/admin.module';
 import { QueueModule } from './queue/queue.module';
 import { StationManagerModule } from './station-manager/station-manager.module';
+import { OwnerModule } from './owner/owner.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -18,6 +20,8 @@ import { StationManagerModule } from './station-manager/station-manager.module';
     AdminModule,
     StationManagerModule,
     QueueModule,
+    OwnerModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

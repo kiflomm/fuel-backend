@@ -19,6 +19,9 @@ import { UpsertFuelPriceDto } from './dto/upsert-fuel-price.dto';
 import { CreateQuotaRuleDto } from './dto/create-quota-rule.dto';
 import { ListQuotaRulesDto } from './dto/list-quota-rules.dto';
 import { UpdateQuotaRuleDto } from './dto/update-quota-rule.dto';
+import { AdminDailyTotalsQueryDto } from './dto/admin-daily-totals-query.dto';
+import { AdminServiceActivityQueryDto } from './dto/admin-service-activity-query.dto';
+import { desc, gte, inArray, lte } from 'drizzle-orm';
 
 function isPgUniqueViolation(error: unknown): boolean {
   return (
@@ -512,5 +515,175 @@ export class AdminService {
     }
 
     return this.mapQuotaRule(row);
+  }
+
+  private normalizeDateRange(from?: string, to?: string) {
+    const fromDate = from ? new Date(from) : undefined;
+    const toDate = to ? new Date(to) : undefined;
+
+    if (fromDate && Number.isNaN(fromDate.getTime())) {
+      throw new BadRequestException('Invalid from date');
+    }
+    if (toDate && Number.isNaN(toDate.getTime())) {
+      throw new BadRequestException('Invalid to date');
+    }
+    if (fromDate && toDate && fromDate > toDate) {
+      throw new BadRequestException('from must be earlier than or equal to to');
+    }
+
+    return { fromDate, toDate };
+  }
+
+  async getDailyTotals(query: AdminDailyTotalsQueryDto) {
+    const resolvedDate = query.date ?? new Date().toISOString().slice(0, 10);
+    const start = new Date(`${resolvedDate}T00:00:00.000Z`);
+    const end = new Date(`${resolvedDate}T23:59:59.999Z`);
+
+    const conditions: SQL<unknown>[] = [
+      gte(schema.transactions.servedAt, start),
+      lte(schema.transactions.servedAt, end),
+    ];
+    if (query.stationId !== undefined) {
+      conditions.push(eq(schema.transactions.stationId, query.stationId));
+    }
+
+    const rows = await this.db
+      .select()
+      .from(schema.transactions)
+      .where(and(...conditions));
+
+    const paymentIds = [...new Set(rows.map((row) => row.paymentId))];
+    const payments = paymentIds.length
+      ? await this.db
+          .select()
+          .from(schema.payments)
+          .where(inArray(schema.payments.id, paymentIds))
+      : [];
+    const paymentMap = new Map(payments.map((row) => [row.id, row]));
+
+    const totals = rows.reduce(
+      (acc, row) => {
+        acc.completedTransactionCount += 1;
+        acc.totalLitersDispensed += Number(row.litersDispensed);
+        acc.uniqueVehicleIds.add(row.vehicleId);
+        acc.totalGrossAmount += Number(paymentMap.get(row.paymentId)?.amount ?? 0);
+        return acc;
+      },
+      {
+        completedTransactionCount: 0,
+        totalLitersDispensed: 0,
+        totalGrossAmount: 0,
+        uniqueVehicleIds: new Set<number>(),
+      },
+    );
+
+    return {
+      date: resolvedDate,
+      stationId: query.stationId ?? null,
+      completedTransactionCount: totals.completedTransactionCount,
+      totalLitersDispensed: totals.totalLitersDispensed.toFixed(2),
+      totalGrossAmount: totals.totalGrossAmount.toFixed(2),
+      uniqueVehiclesServedCount: totals.uniqueVehicleIds.size,
+    };
+  }
+
+  async getServiceActivity(query: AdminServiceActivityQueryDto) {
+    const { fromDate, toDate } = this.normalizeDateRange(query.from, query.to);
+
+    const conditions: SQL<unknown>[] = [];
+    if (query.stationId !== undefined) {
+      conditions.push(eq(schema.transactions.stationId, query.stationId));
+    }
+    if (fromDate) conditions.push(gte(schema.transactions.servedAt, fromDate));
+    if (toDate) conditions.push(lte(schema.transactions.servedAt, toDate));
+
+    const rows = await this.db
+      .select()
+      .from(schema.transactions)
+      .where(conditions.length ? and(...conditions) : undefined);
+
+    const workerIds = [...new Set(rows.map((row) => row.stationWorkerUserId))];
+    const paymentIds = [...new Set(rows.map((row) => row.paymentId))];
+
+    const workers = workerIds.length
+      ? await this.db
+          .select()
+          .from(schema.users)
+          .where(inArray(schema.users.id, workerIds))
+      : [];
+    const workerMap = new Map(workers.map((row) => [row.id, row]));
+
+    const payments = paymentIds.length
+      ? await this.db
+          .select()
+          .from(schema.payments)
+          .where(inArray(schema.payments.id, paymentIds))
+      : [];
+    const paymentMap = new Map(payments.map((row) => [row.id, row]));
+
+    const aggregates = new Map<
+      number,
+      {
+        stationWorkerUserId: number;
+        stationId: number;
+        completedTransactionCount: number;
+        totalLitersDispensed: number;
+        totalGrossAmount: number;
+        latestServiceAt: Date | null;
+      }
+    >();
+
+    for (const row of rows) {
+      const key = row.stationWorkerUserId;
+      const current =
+        aggregates.get(key) ?? {
+          stationWorkerUserId: row.stationWorkerUserId,
+          stationId: row.stationId,
+          completedTransactionCount: 0,
+          totalLitersDispensed: 0,
+          totalGrossAmount: 0,
+          latestServiceAt: null,
+        };
+
+      current.completedTransactionCount += 1;
+      current.totalLitersDispensed += Number(row.litersDispensed);
+      current.totalGrossAmount += Number(paymentMap.get(row.paymentId)?.amount ?? 0);
+      if (!current.latestServiceAt || row.servedAt > current.latestServiceAt) {
+        current.latestServiceAt = row.servedAt;
+      }
+      aggregates.set(key, current);
+    }
+
+    return [...aggregates.values()]
+      .sort((a, b) => {
+        const aTime = a.latestServiceAt?.getTime() ?? 0;
+        const bTime = b.latestServiceAt?.getTime() ?? 0;
+        return bTime - aTime;
+      })
+      .map((entry) => {
+        const worker = workerMap.get(entry.stationWorkerUserId) ?? null;
+        return {
+          stationId: entry.stationId,
+          stationWorker: worker
+            ? {
+                id: worker.id,
+                firstName: worker.firstName,
+                lastName: worker.lastName,
+                email: worker.email,
+              }
+            : {
+                id: entry.stationWorkerUserId,
+                firstName: null,
+                lastName: null,
+                email: null,
+              },
+          completedTransactionCount: entry.completedTransactionCount,
+          totalLitersDispensed: entry.totalLitersDispensed.toFixed(2),
+          totalGrossAmount: entry.totalGrossAmount.toFixed(2),
+          latestServiceAt: entry.latestServiceAt
+            ? entry.latestServiceAt.toISOString()
+            : null,
+        };
+      });
   }
 }

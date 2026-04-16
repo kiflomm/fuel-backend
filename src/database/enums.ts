@@ -71,3 +71,20 @@ export const FUEL_TYPES = ['DIESEL', 'BENZENE'] as const;
 export type FuelType = (typeof FUEL_TYPES)[number];
 
 export const fuelTypeEnum = pgEnum('fuel_type', FUEL_TYPES);
+
+/** Announcement targeting scope. */
+export const ANNOUNCEMENT_SCOPES = ['ALL', 'ROLE', 'STATION'] as const;
+
+export type AnnouncementScope = (typeof ANNOUNCEMENT_SCOPES)[number];
+
+export const announcementScopeEnum = pgEnum(
+  'announcement_scope',
+  ANNOUNCEMENT_SCOPES,
+);
+
+/** Supported device platforms (for push notifications). */
+export const DEVICE_PLATFORMS = ['ANDROID'] as const;
+
+export type DevicePlatform = (typeof DEVICE_PLATFORMS)[number];
+
+export const devicePlatformEnum = pgEnum('device_platform', DEVICE_PLATFORMS);
