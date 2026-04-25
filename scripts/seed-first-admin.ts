@@ -34,14 +34,15 @@ async function main() {
     .where(eq(schema.users.email, email))
     .limit(1);
 
+  const hashedPassword = await bcrypt.hash(password, 10);
+
   if (existing) {
     // eslint-disable-next-line no-console
-    console.log(`Skip: user already exists for email ${email}`);
+    console.log(`User already exists for email ${email}. Updating password...`);
+    await db.update(schema.users).set({ password: hashedPassword }).where(eq(schema.users.email, email));
     await pool.end();
     return;
   }
-
-  const hashedPassword = await bcrypt.hash(password, 10);
 
   await db.insert(schema.users).values({
     email,
