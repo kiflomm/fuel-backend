@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, and, desc, inArray, gte, lte } from 'drizzle-orm';
+import { eq, and, desc, inArray, gte, lte, SQL } from 'drizzle-orm';
 import * as bcrypt from 'bcrypt';
 import * as schema from '../database/schema';
 import { DrizzleAsyncProvider } from '../database/drizzle.provider';
@@ -483,21 +483,16 @@ export class StationManagerService {
   async getDailyTotals(managerUserId: number, query: DailyTotalsQueryDto) {
     const { station } = await this.getManagerContext(managerUserId);
 
-    const resolvedDate =
-      query.date ?? new Date().toISOString().slice(0, 10);
-    const start = new Date(`${resolvedDate}T00:00:00.000Z`);
-    const end = new Date(`${resolvedDate}T23:59:59.999Z`);
+    const { fromDate, toDate } = this.normalizeDateRange(query.from, query.to);
+
+    const conditions: SQL<unknown>[] = [eq(schema.transactions.stationId, station.id)];
+    if (fromDate) conditions.push(gte(schema.transactions.servedAt, fromDate));
+    if (toDate) conditions.push(lte(schema.transactions.servedAt, toDate));
 
     const rows = await this.db
       .select()
       .from(schema.transactions)
-      .where(
-        and(
-          eq(schema.transactions.stationId, station.id),
-          gte(schema.transactions.servedAt, start),
-          lte(schema.transactions.servedAt, end),
-        ),
-      );
+      .where(and(...conditions));
 
     const paymentIds = [...new Set(rows.map((row) => row.paymentId))];
     const payments = paymentIds.length
@@ -508,29 +503,45 @@ export class StationManagerService {
       : [];
     const paymentMap = new Map(payments.map((row) => [row.id, row]));
 
-    const totals = rows.reduce(
-      (acc, row) => {
-        acc.completedTransactionCount += 1;
-        acc.totalLitersDispensed += Number(row.litersDispensed);
-        acc.uniqueVehicleIds.add(row.vehicleId);
-        acc.totalGrossAmount += Number(paymentMap.get(row.paymentId)?.amount ?? 0);
-        return acc;
-      },
-      {
-        completedTransactionCount: 0,
-        totalLitersDispensed: 0,
-        totalGrossAmount: 0,
-        uniqueVehicleIds: new Set<number>(),
-      },
-    );
+    type Bucket = {
+      completedTransactionCount: number;
+      totalLitersDispensed: number;
+      totalGrossAmount: number;
+      uniqueVehicleIds: Set<number>;
+    };
 
-    return {
-      date: resolvedDate,
+    const grouped = new Map<string, Bucket>();
+
+    for (const row of rows) {
+      const dateStr = row.servedAt.toISOString().slice(0, 10);
+      let bucket = grouped.get(dateStr);
+      if (!bucket) {
+        bucket = {
+          completedTransactionCount: 0,
+          totalLitersDispensed: 0,
+          totalGrossAmount: 0,
+          uniqueVehicleIds: new Set<number>(),
+        };
+        grouped.set(dateStr, bucket);
+      }
+      
+      bucket.completedTransactionCount += 1;
+      bucket.totalLitersDispensed += Number(row.litersDispensed);
+      bucket.uniqueVehicleIds.add(row.vehicleId);
+      bucket.totalGrossAmount += Number(paymentMap.get(row.paymentId)?.amount ?? 0);
+    }
+
+    const results = Array.from(grouped.entries()).map(([date, totals]) => ({
+      date,
       completedTransactionCount: totals.completedTransactionCount,
       totalLitersDispensed: totals.totalLitersDispensed.toFixed(2),
       totalGrossAmount: totals.totalGrossAmount.toFixed(2),
       uniqueVehiclesServedCount: totals.uniqueVehicleIds.size,
-    };
+    }));
+
+    results.sort((a, b) => b.date.localeCompare(a.date));
+
+    return results;
   }
 
   async getServiceActivity(
