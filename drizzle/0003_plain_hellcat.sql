@@ -1,0 +1,1 @@
+ALTER TABLE "vehicle_categories" ADD COLUMN "fuel_subsidy_percentage" numeric(5, 2) DEFAULT '0' NOT NULL;

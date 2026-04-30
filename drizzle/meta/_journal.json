@@ -22,6 +22,13 @@
       "when": 1777542711815,
       "tag": "0002_wandering_unicorn",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1777577967319,
+      "tag": "0003_plain_hellcat",
+      "breakpoints": true
     }
   ]
 }

@@ -95,8 +95,16 @@ export class QueueService {
 
   async initiatePayment(ownerUserId: number, dto: InitiatePaymentDto) {
     const [vehicle] = await this.db
-      .select()
+      .select({
+        id: schema.vehicles.id,
+        ownerUserId: schema.vehicles.ownerUserId,
+        fuelSubsidyPercentage: schema.vehicleCategories.fuelSubsidyPercentage,
+      })
       .from(schema.vehicles)
+      .innerJoin(
+        schema.vehicleCategories,
+        eq(schema.vehicles.categoryId, schema.vehicleCategories.id),
+      )
       .where(
         and(
           eq(schema.vehicles.id, dto.vehicleId),
@@ -177,13 +185,28 @@ export class QueueService {
       throw new BadRequestException('Invalid fuel price configuration');
     }
 
-    const amountNum =
+    const fuelSubsidyPercentage = Number(vehicle.fuelSubsidyPercentage ?? 0);
+    if (!Number.isFinite(fuelSubsidyPercentage) || fuelSubsidyPercentage < 0 || fuelSubsidyPercentage > 100) {
+      throw new BadRequestException('Invalid vehicle category fuel subsidy configuration');
+    }
+
+    const grossAmountNum =
       Math.round(dto.litersRequested * pricePerLiter * 100) / 100;
-    if (!Number.isFinite(amountNum) || amountNum <= 0) {
+    if (!Number.isFinite(grossAmountNum) || grossAmountNum <= 0) {
       throw new BadRequestException('Invalid computed amount');
     }
 
+    const subsidyAmountNum =
+      Math.round(grossAmountNum * (fuelSubsidyPercentage / 100) * 100) / 100;
+    const amountNum = Math.round((grossAmountNum - subsidyAmountNum) * 100) / 100;
+    if (!Number.isFinite(amountNum) || amountNum <= 0) {
+      throw new BadRequestException('Invalid computed amount after subsidy');
+    }
+
+    const grossAmount = grossAmountNum.toFixed(2);
+    const subsidyAmount = subsidyAmountNum.toFixed(2);
     const amount = amountNum.toFixed(2);
+    const fuelSubsidyPercentageDisplay = fuelSubsidyPercentage.toFixed(2);
     const txRef = `fuel-v${dto.vehicleId}-s${dto.stationId}-${randomBytes(12).toString('hex')}`;
 
     const [payment] = await this.db
@@ -242,6 +265,9 @@ export class QueueService {
         fuelType: payment.fuelTypeCode,
         litersRequested: payment.litersRequested,
         pricePerLiter: payment.pricePerLiter,
+        grossAmount,
+        fuelSubsidyPercentage: fuelSubsidyPercentageDisplay,
+        subsidyAmount,
         remainingLiters,
         checkoutUrl,
       };
