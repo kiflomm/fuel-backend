@@ -35,6 +35,7 @@ import { AddOwnerVehiclesDto } from './dto/add-owner-vehicles.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { UpsertFuelPriceDto } from './dto/upsert-fuel-price.dto';
 import { CreateFuelTypeDto } from './dto/create-fuel-type.dto';
+import { CreateFuelTypeWithPriceDto } from './dto/create-fuel-type-with-price.dto';
 import { UpdateFuelTypeDto } from './dto/update-fuel-type.dto';
 import { ListFuelTypesDto } from './dto/list-fuel-types.dto';
 import { CreateVehicleCategoryDto } from './dto/create-vehicle-category.dto';
@@ -227,13 +228,13 @@ export class AdminController {
 
   @Post('fuel-types')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Create a fuel type' })
-  @ApiCreatedResponse({ description: 'Fuel type created' })
-  async createFuelType(@Body() dto: CreateFuelTypeDto) {
-    const data = await this.adminService.createFuelType(dto);
+  @ApiOperation({ summary: 'Create a fuel type with price' })
+  @ApiCreatedResponse({ description: 'Fuel type and price created' })
+  async createFuelTypeWithPrice(@Body() dto: CreateFuelTypeWithPriceDto) {
+    const data = await this.adminService.createFuelTypeWithPrice(dto);
     return {
       success: true,
-      message: 'Fuel type created',
+      message: 'Fuel type and price created',
       data,
       timestamp: new Date().toISOString(),
     };
