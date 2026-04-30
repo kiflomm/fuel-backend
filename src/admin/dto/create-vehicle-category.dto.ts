@@ -1,5 +1,14 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  IsBoolean,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
 
 export class CreateVehicleCategoryDto {
   @ApiProperty({ example: 'PRIVATE_CAR' })
@@ -16,6 +25,17 @@ export class CreateVehicleCategoryDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @ApiPropertyOptional({
+    default: 0,
+    description: 'Fuel subsidy percentage applied to this category (0-100)',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(100)
+  fuelSubsidyPercentage?: number;
 
   @ApiPropertyOptional({ default: true })
   @IsOptional()

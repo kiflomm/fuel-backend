@@ -109,6 +109,7 @@ export class AdminService {
       code: row.code,
       name: row.name,
       description: row.description,
+      fuelSubsidyPercentage: row.fuelSubsidyPercentage,
       isActive: row.isActive,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
@@ -782,6 +783,10 @@ export class AdminService {
           code,
           name,
           description: dto.description?.trim() || null,
+          fuelSubsidyPercentage:
+            dto.fuelSubsidyPercentage !== undefined
+              ? dto.fuelSubsidyPercentage.toFixed(2)
+              : '0.00',
           isActive: dto.isActive ?? true,
           updatedAt: new Date(),
         })
@@ -831,6 +836,9 @@ export class AdminService {
     if (dto.code !== undefined) patch.code = dto.code.trim().toUpperCase();
     if (dto.name !== undefined) patch.name = dto.name.trim();
     if (dto.description !== undefined) patch.description = dto.description.trim() || null;
+    if (dto.fuelSubsidyPercentage !== undefined) {
+      patch.fuelSubsidyPercentage = dto.fuelSubsidyPercentage.toFixed(2);
+    }
     if (dto.isActive !== undefined) patch.isActive = dto.isActive;
     try {
       const [row] = await this.db
