@@ -12,20 +12,6 @@ export type UserRole = (typeof USER_ROLES)[number];
 
 export const userRoleEnum = pgEnum('user_role', USER_ROLES);
 
-/** Vehicle categories for quota rules and registration. */
-export const VEHICLE_CATEGORIES = [
-  'PRIVATE_CAR',
-  'TAXI',
-  'BUS',
-  'TRUCK',
-  'MOTORCYCLE',
-  'OTHER',
-] as const;
-
-export type VehicleCategory = (typeof VEHICLE_CATEGORIES)[number];
-
-export const vehicleCategoryEnum = pgEnum('vehicle_category', VEHICLE_CATEGORIES);
-
 /** Station-reported fuel availability for the mobile app and admin views. */
 export const STATION_FUEL_STATUSES = ['AVAILABLE', 'LIMITED', 'UNAVAILABLE'] as const;
 

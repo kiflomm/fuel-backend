@@ -42,7 +42,7 @@ export class OwnerService {
     return rows.map((v) => ({
       id: v.id,
       plateNumber: v.plateNumber,
-      category: v.category,
+      categoryId: v.categoryId,
       label: v.label,
       isActive: v.isActive,
       createdAt: v.createdAt.toISOString(),
@@ -69,7 +69,7 @@ export class OwnerService {
     return {
       id: vehicle.id,
       plateNumber: vehicle.plateNumber,
-      category: vehicle.category,
+      categoryId: vehicle.categoryId,
       label: vehicle.label,
       isActive: vehicle.isActive,
       createdAt: vehicle.createdAt.toISOString(),
@@ -155,7 +155,7 @@ export class OwnerService {
       vehicle: {
         id: number;
         plateNumber: string;
-        category: typeof schema.vehicles.$inferSelect.category;
+        categoryId: number;
         label: string | null;
       } | null;
       payment: {
@@ -211,7 +211,7 @@ export class OwnerService {
           ? {
               id: vehicle.id,
               plateNumber: vehicle.plateNumber,
-              category: vehicle.category,
+              categoryId: vehicle.categoryId,
               label: vehicle.label,
             }
           : null,
@@ -308,7 +308,7 @@ export class OwnerService {
           ? {
               id: vehicle.id,
               plateNumber: vehicle.plateNumber,
-              category: vehicle.category,
+              categoryId: vehicle.categoryId,
               label: vehicle.label,
             }
           : null,
@@ -389,7 +389,7 @@ export class OwnerService {
         ? {
             id: vehicle.id,
             plateNumber: vehicle.plateNumber,
-            category: vehicle.category,
+            categoryId: vehicle.categoryId,
             label: vehicle.label,
           }
         : null,

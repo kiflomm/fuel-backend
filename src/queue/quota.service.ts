@@ -82,20 +82,20 @@ export class QuotaService {
     return vehicle;
   }
 
-  private async getActiveRules(vehicleCategory: typeof schema.vehicles.$inferSelect.category) {
+  private async getActiveRules(vehicleId: number) {
     const rules = await this.db
       .select()
-      .from(schema.quotaRules)
+      .from(schema.vehicleQuotaRules)
       .where(
         and(
-          eq(schema.quotaRules.vehicleCategory, vehicleCategory),
-          eq(schema.quotaRules.isActive, true),
+          eq(schema.vehicleQuotaRules.vehicleId, vehicleId),
+          eq(schema.vehicleQuotaRules.isActive, true),
         ),
       );
 
     if (rules.length === 0) {
       throw new BadRequestException(
-        'No active quota rule for this vehicle category. Ask an administrator to configure quota rules.',
+        'No active quota rule for this vehicle. Ask an administrator to configure quota rules.',
       );
     }
 
@@ -118,7 +118,7 @@ export class QuotaService {
   private async ensureBalanceForRule(
     executor: DbLike,
     vehicleId: number,
-    rule: typeof schema.quotaRules.$inferSelect,
+    rule: typeof schema.vehicleQuotaRules.$inferSelect,
     now: Date,
   ): Promise<ActiveBalance> {
     const { start, end } = getPeriodBounds(rule.period, now);
@@ -183,7 +183,7 @@ export class QuotaService {
     periods: ActiveBalance[];
   }> {
     const vehicle = await this.getVehicleOrThrow(vehicleId);
-    const rules = await this.getActiveRules(vehicle.category);
+    const rules = await this.getActiveRules(vehicle.id);
     const now = new Date();
     const balances: ActiveBalance[] = [];
 
@@ -248,7 +248,7 @@ export class QuotaService {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(${vehicleId})`);
 
     const vehicle = await this.getVehicleOrThrow(vehicleId);
-    const rules = await this.getActiveRules(vehicle.category);
+    const rules = await this.getActiveRules(vehicle.id);
     const now = new Date();
     const updatedBalances: ActiveBalance[] = [];
 

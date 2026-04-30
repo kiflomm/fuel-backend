@@ -313,7 +313,7 @@ export class StationManagerService {
           ? {
               id: vehicle.id,
               plateNumber: vehicle.plateNumber,
-              category: vehicle.category,
+              categoryId: vehicle.categoryId,
               label: vehicle.label,
             }
           : null,
@@ -452,7 +452,7 @@ export class StationManagerService {
           ? {
               id: vehicle.id,
               plateNumber: vehicle.plateNumber,
-              category: vehicle.category,
+              categoryId: vehicle.categoryId,
               label: vehicle.label,
             }
           : null,
