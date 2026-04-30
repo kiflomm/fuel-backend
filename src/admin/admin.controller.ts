@@ -31,6 +31,7 @@ import { CreateStationDto } from './dto/create-station.dto';
 import { UpdateStationDto } from './dto/update-station.dto';
 import { CreateStationManagerDto } from './dto/create-station-manager.dto';
 import { CreateVehicleOwnerDto } from './dto/create-vehicle-owner.dto';
+import { AddOwnerVehiclesDto } from './dto/add-owner-vehicles.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { UpsertFuelPriceDto } from './dto/upsert-fuel-price.dto';
 import { CreateQuotaRuleDto } from './dto/create-quota-rule.dto';
@@ -143,6 +144,23 @@ export class AdminController {
     return {
       success: true,
       message: 'Vehicle owner created',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Post('users/vehicle-owners/:id/vehicles')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Add one or more vehicles to an existing vehicle owner' })
+  @ApiCreatedResponse({ description: 'Vehicles added to owner' })
+  async addVehiclesToOwner(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: AddOwnerVehiclesDto,
+  ) {
+    const data = await this.adminService.addVehiclesToOwner(id, dto);
+    return {
+      success: true,
+      message: 'Vehicles added',
       data,
       timestamp: new Date().toISOString(),
     };
