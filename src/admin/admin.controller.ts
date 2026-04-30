@@ -34,6 +34,9 @@ import { CreateVehicleOwnerDto } from './dto/create-vehicle-owner.dto';
 import { AddOwnerVehiclesDto } from './dto/add-owner-vehicles.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { UpsertFuelPriceDto } from './dto/upsert-fuel-price.dto';
+import { CreateFuelTypeDto } from './dto/create-fuel-type.dto';
+import { UpdateFuelTypeDto } from './dto/update-fuel-type.dto';
+import { ListFuelTypesDto } from './dto/list-fuel-types.dto';
 import { CreateQuotaRuleDto } from './dto/create-quota-rule.dto';
 import { UpdateQuotaRuleDto } from './dto/update-quota-rule.dto';
 import { ListQuotaRulesDto } from './dto/list-quota-rules.dto';
@@ -204,6 +207,62 @@ export class AdminController {
     return {
       success: true,
       message: 'User status updated',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Get('fuel-types')
+  @ApiOperation({ summary: 'List fuel types' })
+  @ApiOkResponse({ description: 'Fuel types' })
+  async listFuelTypes(@Query() query: ListFuelTypesDto) {
+    const data = await this.adminService.listFuelTypes(query);
+    return {
+      success: true,
+      message: 'Fuel types retrieved',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Post('fuel-types')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Create a fuel type' })
+  @ApiCreatedResponse({ description: 'Fuel type created' })
+  async createFuelType(@Body() dto: CreateFuelTypeDto) {
+    const data = await this.adminService.createFuelType(dto);
+    return {
+      success: true,
+      message: 'Fuel type created',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Patch('fuel-types/:id')
+  @ApiOperation({ summary: 'Update a fuel type' })
+  @ApiOkResponse({ description: 'Fuel type updated' })
+  async updateFuelType(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateFuelTypeDto,
+  ) {
+    const data = await this.adminService.updateFuelType(id, dto);
+    return {
+      success: true,
+      message: 'Fuel type updated',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Delete('fuel-types/:id')
+  @ApiOperation({ summary: 'Delete a fuel type' })
+  @ApiOkResponse({ description: 'Fuel type deleted' })
+  async deleteFuelType(@Param('id', ParseIntPipe) id: number) {
+    const data = await this.adminService.deleteFuelType(id);
+    return {
+      success: true,
+      message: 'Fuel type deleted',
       data,
       timestamp: new Date().toISOString(),
     };

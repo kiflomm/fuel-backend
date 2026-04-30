@@ -8,6 +8,13 @@
       "when": 1776323650183,
       "tag": "0000_rainy_puff_adder",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1777538092955,
+      "tag": "0001_neat_starhawk",
+      "breakpoints": true
     }
   ]
 }

@@ -65,13 +65,6 @@ export const queueBookingStatusEnum = pgEnum(
   QUEUE_BOOKING_STATUSES,
 );
 
-/** Fuel types for pricing and payments. */
-export const FUEL_TYPES = ['DIESEL', 'BENZENE'] as const;
-
-export type FuelType = (typeof FUEL_TYPES)[number];
-
-export const fuelTypeEnum = pgEnum('fuel_type', FUEL_TYPES);
-
 /** Announcement targeting scope. */
 export const ANNOUNCEMENT_SCOPES = ['ALL', 'ROLE', 'STATION'] as const;
 

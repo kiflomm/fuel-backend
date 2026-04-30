@@ -161,7 +161,7 @@ export class OwnerService {
       payment: {
         id: number;
         status: typeof schema.payments.$inferSelect.status;
-        fuelType: typeof schema.payments.$inferSelect.fuelType;
+        fuelType: typeof schema.payments.$inferSelect.fuelTypeCode;
         litersRequested: string;
         pricePerLiter: string;
         amount: string;
@@ -219,7 +219,7 @@ export class OwnerService {
           ? {
               id: payment.id,
               status: payment.status,
-              fuelType: payment.fuelType,
+              fuelType: payment.fuelTypeCode,
               litersRequested: payment.litersRequested,
               pricePerLiter: payment.pricePerLiter,
               amount: payment.amount,
@@ -316,7 +316,7 @@ export class OwnerService {
           ? {
               id: payment.id,
               status: payment.status,
-              fuelType: payment.fuelType,
+              fuelType: payment.fuelTypeCode,
               litersRequested: payment.litersRequested,
               pricePerLiter: payment.pricePerLiter,
               amount: payment.amount,
@@ -397,7 +397,7 @@ export class OwnerService {
         ? {
             id: payment.id,
             status: payment.status,
-            fuelType: payment.fuelType,
+            fuelType: payment.fuelTypeCode,
             litersRequested: payment.litersRequested,
             pricePerLiter: payment.pricePerLiter,
             amount: payment.amount,

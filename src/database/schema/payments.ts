@@ -8,7 +8,7 @@ import {
   json,
   unique,
 } from 'drizzle-orm/pg-core';
-import { fuelTypeEnum, paymentStatusEnum } from '../enums';
+import { paymentStatusEnum } from '../enums';
 import { vehicles } from './vehicles';
 import { stations } from './stations';
 
@@ -29,7 +29,8 @@ export const payments = pgTable(
     provider: text('provider').notNull().default('CHAPA'),
     txRef: text('tx_ref').notNull(),
     status: paymentStatusEnum('status').notNull().default('PENDING'),
-    fuelType: fuelTypeEnum('fuel_type').notNull(),
+    /** Snapshot of the fuel type code at the time of payment. */
+    fuelTypeCode: text('fuel_type_code').notNull(),
     litersRequested: numeric('liters_requested', { precision: 10, scale: 2 }).notNull(),
     pricePerLiter: numeric('price_per_liter', { precision: 12, scale: 2 }).notNull(),
     amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),

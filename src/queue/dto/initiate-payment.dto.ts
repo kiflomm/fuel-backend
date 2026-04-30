@@ -1,8 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import type { FuelType } from '../../database/enums';
-import { FUEL_TYPES } from '../../database/enums';
 import {
-  IsIn,
   IsInt,
   IsNotEmpty,
   IsNumber,
@@ -26,9 +23,10 @@ export class InitiatePaymentDto {
   @Min(1)
   stationId: number;
 
-  @ApiProperty({ enum: FUEL_TYPES })
-  @IsIn(FUEL_TYPES)
-  fuelType: FuelType;
+  @ApiProperty({ description: 'Fuel type code (admin-managed)' })
+  @IsString()
+  @IsNotEmpty()
+  fuelType: string;
 
   @ApiProperty({ description: 'Liters requested (must be within remaining quota)' })
   @Type(() => Number)
