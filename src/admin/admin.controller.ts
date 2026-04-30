@@ -37,9 +37,9 @@ import { UpsertFuelPriceDto } from './dto/upsert-fuel-price.dto';
 import { CreateFuelTypeDto } from './dto/create-fuel-type.dto';
 import { UpdateFuelTypeDto } from './dto/update-fuel-type.dto';
 import { ListFuelTypesDto } from './dto/list-fuel-types.dto';
-import { CreateQuotaRuleDto } from './dto/create-quota-rule.dto';
-import { UpdateQuotaRuleDto } from './dto/update-quota-rule.dto';
-import { ListQuotaRulesDto } from './dto/list-quota-rules.dto';
+import { CreateVehicleCategoryDto } from './dto/create-vehicle-category.dto';
+import { UpdateVehicleCategoryDto } from './dto/update-vehicle-category.dto';
+import { ListVehicleCategoriesDto } from './dto/list-vehicle-categories.dto';
 import { AdminDailyTotalsQueryDto } from './dto/admin-daily-totals-query.dto';
 import { AdminServiceActivityQueryDto } from './dto/admin-service-activity-query.dto';
 import { AdminDistributionQueryDto } from './dto/admin-distribution-query.dto';
@@ -295,70 +295,70 @@ export class AdminController {
     };
   }
 
-  @Post('quota-rules')
+  @Post('vehicle-categories')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Create a quota rule for a vehicle category and period' })
-  @ApiCreatedResponse({ description: 'Quota rule created' })
-  async createQuotaRule(@Body() dto: CreateQuotaRuleDto) {
-    const data = await this.adminService.createQuotaRule(dto);
+  @ApiOperation({ summary: 'Create a vehicle category' })
+  @ApiCreatedResponse({ description: 'Vehicle category created' })
+  async createVehicleCategory(@Body() dto: CreateVehicleCategoryDto) {
+    const data = await this.adminService.createVehicleCategory(dto);
     return {
       success: true,
-      message: 'Quota rule created',
+      message: 'Vehicle category created',
       data,
       timestamp: new Date().toISOString(),
     };
   }
 
-  @Get('quota-rules')
-  @ApiOperation({ summary: 'List quota rules' })
-  @ApiOkResponse({ description: 'Quota rules retrieved' })
-  async listQuotaRules(@Query() query: ListQuotaRulesDto) {
-    const data = await this.adminService.listQuotaRules(query);
+  @Get('vehicle-categories')
+  @ApiOperation({ summary: 'List vehicle categories' })
+  @ApiOkResponse({ description: 'Vehicle categories retrieved' })
+  async listVehicleCategories(@Query() query: ListVehicleCategoriesDto) {
+    const data = await this.adminService.listVehicleCategories(query);
     return {
       success: true,
-      message: 'Quota rules retrieved',
+      message: 'Vehicle categories retrieved',
       data,
       timestamp: new Date().toISOString(),
     };
   }
 
-  @Get('quota-rules/:id')
-  @ApiOperation({ summary: 'Get a quota rule by id' })
-  @ApiOkResponse({ description: 'Quota rule retrieved' })
-  async getQuotaRule(@Param('id', ParseIntPipe) id: number) {
-    const data = await this.adminService.getQuotaRuleById(id);
+  @Get('vehicle-categories/:id')
+  @ApiOperation({ summary: 'Get a vehicle category by id' })
+  @ApiOkResponse({ description: 'Vehicle category retrieved' })
+  async getVehicleCategory(@Param('id', ParseIntPipe) id: number) {
+    const data = await this.adminService.getVehicleCategoryById(id);
     return {
       success: true,
-      message: 'Quota rule retrieved',
+      message: 'Vehicle category retrieved',
       data,
       timestamp: new Date().toISOString(),
     };
   }
 
-  @Patch('quota-rules/:id')
-  @ApiOperation({ summary: 'Update a quota rule' })
-  @ApiOkResponse({ description: 'Quota rule updated' })
-  async updateQuotaRule(
+  @Patch('vehicle-categories/:id')
+  @ApiOperation({ summary: 'Update a vehicle category' })
+  @ApiOkResponse({ description: 'Vehicle category updated' })
+  async updateVehicleCategory(
     @Param('id', ParseIntPipe) id: number,
-    @Body() dto: UpdateQuotaRuleDto,
+    @Body() dto: UpdateVehicleCategoryDto,
   ) {
-    const data = await this.adminService.updateQuotaRule(id, dto);
+    const data = await this.adminService.updateVehicleCategory(id, dto);
     return {
       success: true,
-      message: 'Quota rule updated',
+      message: 'Vehicle category updated',
       data,
       timestamp: new Date().toISOString(),
     };
   }
 
-  @Delete('quota-rules/:id')
-  @ApiOperation({ summary: 'Delete a quota rule' })
-  @ApiOkResponse({ description: 'Quota rule deleted' })
-  async deleteQuotaRule(@Param('id', ParseIntPipe) id: number) {
-    const data = await this.adminService.deleteQuotaRule(id);
+  @Delete('vehicle-categories/:id')
+  @ApiOperation({ summary: 'Delete a vehicle category' })
+  @ApiOkResponse({ description: 'Vehicle category deleted' })
+  async deleteVehicleCategory(@Param('id', ParseIntPipe) id: number) {
+    const data = await this.adminService.deleteVehicleCategory(id);
     return {
       success: true,
-      message: 'Quota rule deleted',
+      message: 'Vehicle category deleted',
       data,
       timestamp: new Date().toISOString(),
     };

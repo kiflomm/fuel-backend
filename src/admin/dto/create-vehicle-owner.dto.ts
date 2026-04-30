@@ -1,17 +1,40 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
   IsArray,
+  ArrayMinSize,
   IsEmail,
+  IsBoolean,
   IsIn,
+  IsInt,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
   IsString,
+  Min,
   MinLength,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import type { VehicleCategory } from '../../database/enums';
-import { VEHICLE_CATEGORIES } from '../../database/enums';
+import type { QuotaPeriod } from '../../database/enums';
+import { QUOTA_PERIODS } from '../../database/enums';
+
+export class CreateVehicleQuotaRuleItemDto {
+  @ApiProperty({ enum: QUOTA_PERIODS })
+  @IsNotEmpty()
+  @IsIn(QUOTA_PERIODS)
+  period: QuotaPeriod;
+
+  @ApiProperty({ example: 120 })
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0.01)
+  litersLimit: number;
+
+  @ApiProperty({ required: false, default: true })
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+}
 
 export class CreateVehicleItemDto {
   @ApiProperty({ example: '3-12345-AA' })
@@ -19,14 +42,23 @@ export class CreateVehicleItemDto {
   @IsNotEmpty()
   plateNumber: string;
 
-  @ApiProperty({ enum: VEHICLE_CATEGORIES })
-  @IsIn(VEHICLE_CATEGORIES)
-  category: VehicleCategory;
+  @ApiProperty({ example: 1 })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  categoryId: number;
 
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
   label?: string;
+
+  @ApiProperty({ type: [CreateVehicleQuotaRuleItemDto] })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => CreateVehicleQuotaRuleItemDto)
+  quotaRules: CreateVehicleQuotaRuleItemDto[];
 }
 
 export class CreateVehicleOwnerDto {
