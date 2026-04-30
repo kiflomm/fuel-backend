@@ -15,6 +15,13 @@
       "when": 1777538092955,
       "tag": "0001_neat_starhawk",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777542711815,
+      "tag": "0002_wandering_unicorn",
+      "breakpoints": true
     }
   ]
 }
