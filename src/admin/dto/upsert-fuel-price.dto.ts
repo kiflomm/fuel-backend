@@ -1,13 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import type { FuelType } from '../../database/enums';
-import { FUEL_TYPES } from '../../database/enums';
-import { IsBoolean, IsIn, IsNotEmpty, IsNumber, IsOptional, Min } from 'class-validator';
+import { IsBoolean, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class UpsertFuelPriceDto {
-  @ApiProperty({ enum: FUEL_TYPES })
-  @IsIn(FUEL_TYPES)
-  fuelType: FuelType;
+  @ApiProperty({ description: 'Fuel type code (admin-managed)' })
+  @IsString()
+  @IsNotEmpty()
+  fuelTypeCode: string;
 
   @ApiProperty({ description: 'Price per liter (ETB)' })
   @Type(() => Number)

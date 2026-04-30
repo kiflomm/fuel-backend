@@ -65,13 +65,27 @@ export class QueueService {
 
   async listFuelPrices() {
     const rows = await this.db
-      .select()
+      .select({
+        id: schema.fuelPrices.id,
+        pricePerLiter: schema.fuelPrices.pricePerLiter,
+        isActive: schema.fuelPrices.isActive,
+        createdAt: schema.fuelPrices.createdAt,
+        updatedAt: schema.fuelPrices.updatedAt,
+        fuelTypeCode: schema.fuelTypes.code,
+        fuelTypeName: schema.fuelTypes.name,
+      })
       .from(schema.fuelPrices)
-      .where(eq(schema.fuelPrices.isActive, true));
+      .innerJoin(
+        schema.fuelTypes,
+        eq(schema.fuelPrices.fuelTypeId, schema.fuelTypes.id),
+      )
+      .where(
+        and(eq(schema.fuelPrices.isActive, true), eq(schema.fuelTypes.isActive, true)),
+      );
 
     return rows.map((row) => ({
       id: row.id,
-      fuelType: row.fuelType,
+      fuelType: row.fuelTypeCode,
       pricePerLiter: row.pricePerLiter,
       isActive: row.isActive,
       createdAt: row.createdAt.toISOString(),
@@ -132,12 +146,23 @@ export class QueueService {
     }
 
     const [priceRow] = await this.db
-      .select()
+      .select({
+        id: schema.fuelPrices.id,
+        pricePerLiter: schema.fuelPrices.pricePerLiter,
+        fuelTypeId: schema.fuelPrices.fuelTypeId,
+        isActive: schema.fuelPrices.isActive,
+        fuelTypeCode: schema.fuelTypes.code,
+      })
       .from(schema.fuelPrices)
+      .innerJoin(
+        schema.fuelTypes,
+        eq(schema.fuelPrices.fuelTypeId, schema.fuelTypes.id),
+      )
       .where(
         and(
-          eq(schema.fuelPrices.fuelType, dto.fuelType),
           eq(schema.fuelPrices.isActive, true),
+          eq(schema.fuelTypes.isActive, true),
+          eq(schema.fuelTypes.code, String(dto.fuelType)),
         ),
       )
       .limit(1);
@@ -168,7 +193,7 @@ export class QueueService {
         stationId: dto.stationId,
         txRef,
         status: 'PENDING',
-        fuelType: dto.fuelType,
+        fuelTypeCode: priceRow.fuelTypeCode,
         litersRequested: String(dto.litersRequested),
         pricePerLiter: String(priceRow.pricePerLiter),
         amount,
@@ -214,7 +239,7 @@ export class QueueService {
         txRef: payment.txRef,
         amount: payment.amount,
         currency: payment.currency,
-        fuelType: payment.fuelType,
+        fuelType: payment.fuelTypeCode,
         litersRequested: payment.litersRequested,
         pricePerLiter: payment.pricePerLiter,
         remainingLiters,
@@ -524,7 +549,7 @@ export class QueueService {
       payment: {
         id: payment.id,
         status: payment.status,
-        fuelType: payment.fuelType,
+        fuelType: payment.fuelTypeCode,
         litersRequested: payment.litersRequested,
         pricePerLiter: payment.pricePerLiter,
         amount: payment.amount,

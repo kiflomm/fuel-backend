@@ -17,6 +17,9 @@ import { CreateVehicleOwnerDto } from './dto/create-vehicle-owner.dto';
 import { AddOwnerVehiclesDto } from './dto/add-owner-vehicles.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { UpsertFuelPriceDto } from './dto/upsert-fuel-price.dto';
+import { CreateFuelTypeDto } from './dto/create-fuel-type.dto';
+import { UpdateFuelTypeDto } from './dto/update-fuel-type.dto';
+import { ListFuelTypesDto } from './dto/list-fuel-types.dto';
 import { CreateQuotaRuleDto } from './dto/create-quota-rule.dto';
 import { ListQuotaRulesDto } from './dto/list-quota-rules.dto';
 import { UpdateQuotaRuleDto } from './dto/update-quota-rule.dto';
@@ -384,9 +387,167 @@ export class AdminService {
     };
   }
 
+  async listFuelTypes(query: ListFuelTypesDto) {
+    const includeInactive = query.includeInactive === true;
+    const base = this.db.select().from(schema.fuelTypes);
+    const rows = includeInactive
+      ? await base
+      : await base.where(eq(schema.fuelTypes.isActive, true));
+
+    return rows.map((row) => ({
+      id: row.id,
+      code: row.code,
+      name: row.name,
+      isActive: row.isActive,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    }));
+  }
+
+  async createFuelType(dto: CreateFuelTypeDto) {
+    const code = String(dto.code ?? '').trim().toUpperCase();
+    const name = String(dto.name ?? '').trim();
+    if (!code) throw new BadRequestException('code is required');
+    if (!name) throw new BadRequestException('name is required');
+
+    try {
+      const [row] = await this.db
+        .insert(schema.fuelTypes)
+        .values({
+          code,
+          name,
+          isActive: dto.isActive ?? true,
+          updatedAt: new Date(),
+        })
+        .returning();
+
+      return {
+        id: row.id,
+        code: row.code,
+        name: row.name,
+        isActive: row.isActive,
+        createdAt: row.createdAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
+      };
+    } catch (e) {
+      if (isPgUniqueViolation(e)) {
+        throw new ConflictException('Fuel type code already exists');
+      }
+      throw e;
+    }
+  }
+
+  async updateFuelType(id: number, dto: UpdateFuelTypeDto) {
+    const [existing] = await this.db
+      .select()
+      .from(schema.fuelTypes)
+      .where(eq(schema.fuelTypes.id, id))
+      .limit(1);
+    if (!existing) throw new NotFoundException('Fuel type not found');
+
+    const patch: Partial<typeof schema.fuelTypes.$inferInsert> = {
+      updatedAt: new Date(),
+    };
+
+    if (dto.name !== undefined) {
+      const name = String(dto.name ?? '').trim();
+      if (!name) throw new BadRequestException('name cannot be empty');
+      patch.name = name;
+    }
+
+    if (dto.isActive !== undefined) {
+      patch.isActive = dto.isActive;
+    }
+
+    if (dto.code !== undefined) {
+      const nextCode = String(dto.code ?? '').trim().toUpperCase();
+      if (!nextCode) throw new BadRequestException('code cannot be empty');
+
+      if (nextCode !== existing.code) {
+        const [anyPayment] = await this.db
+          .select({ id: schema.payments.id })
+          .from(schema.payments)
+          .where(eq(schema.payments.fuelTypeCode, existing.code))
+          .limit(1);
+        if (anyPayment) {
+          throw new ConflictException(
+            'Cannot change code after payments exist for this fuel type',
+          );
+        }
+        patch.code = nextCode;
+      }
+    }
+
+    try {
+      const [row] = await this.db
+        .update(schema.fuelTypes)
+        .set(patch)
+        .where(eq(schema.fuelTypes.id, id))
+        .returning();
+
+      return {
+        id: row.id,
+        code: row.code,
+        name: row.name,
+        isActive: row.isActive,
+        createdAt: row.createdAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
+      };
+    } catch (e) {
+      if (isPgUniqueViolation(e)) {
+        throw new ConflictException('Fuel type code already exists');
+      }
+      throw e;
+    }
+  }
+
+  async deleteFuelType(id: number) {
+    const [existing] = await this.db
+      .select()
+      .from(schema.fuelTypes)
+      .where(eq(schema.fuelTypes.id, id))
+      .limit(1);
+    if (!existing) throw new NotFoundException('Fuel type not found');
+
+    const [anyPrice] = await this.db
+      .select({ id: schema.fuelPrices.id })
+      .from(schema.fuelPrices)
+      .where(eq(schema.fuelPrices.fuelTypeId, existing.id))
+      .limit(1);
+    if (anyPrice) {
+      throw new ConflictException('Cannot delete fuel type while fuel prices exist');
+    }
+
+    const [anyPayment] = await this.db
+      .select({ id: schema.payments.id })
+      .from(schema.payments)
+      .where(eq(schema.payments.fuelTypeCode, existing.code))
+      .limit(1);
+    if (anyPayment) {
+      throw new ConflictException('Cannot delete fuel type while payments exist');
+    }
+
+    await this.db.delete(schema.fuelTypes).where(eq(schema.fuelTypes.id, id));
+    return { id };
+  }
+
   async upsertFuelPrice(dto: UpsertFuelPriceDto) {
+    const code = String(dto.fuelTypeCode ?? '').trim().toUpperCase();
+    if (!code) {
+      throw new BadRequestException('fuelTypeCode is required');
+    }
+
+    const [fuelType] = await this.db
+      .select()
+      .from(schema.fuelTypes)
+      .where(eq(schema.fuelTypes.code, code))
+      .limit(1);
+    if (!fuelType) {
+      throw new BadRequestException('Unknown fuel type');
+    }
+
     const patch = {
-      fuelType: dto.fuelType,
+      fuelTypeId: fuelType.id,
       pricePerLiter: dto.pricePerLiter.toFixed(2),
       isActive: dto.isActive ?? true,
       updatedAt: new Date(),
@@ -395,7 +556,7 @@ export class AdminService {
     const [existing] = await this.db
       .select()
       .from(schema.fuelPrices)
-      .where(eq(schema.fuelPrices.fuelType, dto.fuelType))
+      .where(eq(schema.fuelPrices.fuelTypeId, fuelType.id))
       .limit(1);
 
     if (existing) {
@@ -406,7 +567,8 @@ export class AdminService {
         .returning();
       return {
         id: row.id,
-        fuelType: row.fuelType,
+        fuelType: code,
+        fuelTypeName: fuelType.name,
         pricePerLiter: row.pricePerLiter,
         isActive: row.isActive,
         createdAt: row.createdAt.toISOString(),
@@ -418,7 +580,7 @@ export class AdminService {
       const [row] = await this.db
         .insert(schema.fuelPrices)
         .values({
-          fuelType: patch.fuelType,
+          fuelTypeId: patch.fuelTypeId,
           pricePerLiter: patch.pricePerLiter,
           isActive: patch.isActive,
           updatedAt: patch.updatedAt,
@@ -426,7 +588,8 @@ export class AdminService {
         .returning();
       return {
         id: row.id,
-        fuelType: row.fuelType,
+        fuelType: code,
+        fuelTypeName: fuelType.name,
         pricePerLiter: row.pricePerLiter,
         isActive: row.isActive,
         createdAt: row.createdAt.toISOString(),
@@ -441,10 +604,25 @@ export class AdminService {
   }
 
   async listFuelPrices() {
-    const rows = await this.db.select().from(schema.fuelPrices);
+    const rows = await this.db
+      .select({
+        id: schema.fuelPrices.id,
+        pricePerLiter: schema.fuelPrices.pricePerLiter,
+        isActive: schema.fuelPrices.isActive,
+        createdAt: schema.fuelPrices.createdAt,
+        updatedAt: schema.fuelPrices.updatedAt,
+        fuelTypeCode: schema.fuelTypes.code,
+        fuelTypeName: schema.fuelTypes.name,
+      })
+      .from(schema.fuelPrices)
+      .innerJoin(
+        schema.fuelTypes,
+        eq(schema.fuelPrices.fuelTypeId, schema.fuelTypes.id),
+      );
     return rows.map((row) => ({
       id: row.id,
-      fuelType: row.fuelType,
+      fuelType: row.fuelTypeCode,
+      fuelTypeName: row.fuelTypeName,
       pricePerLiter: row.pricePerLiter,
       isActive: row.isActive,
       createdAt: row.createdAt.toISOString(),
@@ -666,7 +844,7 @@ export class AdminService {
 
       const liters = Number(txn.litersDispensed);
       const amount = Number(payment?.amount ?? 0);
-      const fuelType = String(payment?.fuelType ?? 'UNKNOWN');
+      const fuelType = String(payment?.fuelTypeCode ?? 'UNKNOWN');
       const category = String(vehicle?.category ?? 'UNKNOWN');
 
       totalsOverall.completedTransactionCount += 1;

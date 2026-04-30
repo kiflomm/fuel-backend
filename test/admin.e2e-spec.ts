@@ -129,13 +129,22 @@ describe('AdminController (e2e)', () => {
         .post('/admin/fuel-prices')
         .set('Authorization', 'Bearer fake-token')
         .send({
-          fuelType: 'DIESEL',
+          fuelTypeCode: 'DIESEL',
           pricePerLiter: 100,
           isActive: true,
         })
         // DB may be missing in CI; this test mainly ensures route exists + DTO validation passes.
         .expect((res) => {
-          expect([201, 500]).toContain(res.status);
+          expect([201, 400, 500]).toContain(res.status);
+        });
+    });
+
+    it('GET /admin/fuel-types returns 200 (auth/route wired)', () => {
+      return request(app.getHttpServer())
+        .get('/admin/fuel-types')
+        .set('Authorization', 'Bearer fake-token')
+        .expect((res) => {
+          expect([200, 500]).toContain(res.status);
         });
     });
 

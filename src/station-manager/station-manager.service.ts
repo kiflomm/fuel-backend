@@ -328,7 +328,7 @@ export class StationManagerService {
         payment: payment
           ? {
               id: payment.id,
-              fuelType: payment.fuelType,
+              fuelType: payment.fuelTypeCode,
               litersRequested: payment.litersRequested,
               pricePerLiter: payment.pricePerLiter,
               amount: payment.amount,
@@ -467,7 +467,7 @@ export class StationManagerService {
         payment: payment
           ? {
               id: payment.id,
-              fuelType: payment.fuelType,
+              fuelType: payment.fuelTypeCode,
               litersRequested: payment.litersRequested,
               pricePerLiter: payment.pricePerLiter,
               amount: payment.amount,
