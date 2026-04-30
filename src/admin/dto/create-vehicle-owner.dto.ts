@@ -1,7 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
   IsArray,
-  ArrayMinSize,
   IsEmail,
   IsIn,
   IsNotEmpty,
@@ -51,9 +50,9 @@ export class CreateVehicleOwnerDto {
   lastName: string;
 
   @ApiProperty({ type: [CreateVehicleItemDto] })
+  @IsOptional()
   @IsArray()
-  @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => CreateVehicleItemDto)
-  vehicles: CreateVehicleItemDto[];
+  vehicles?: CreateVehicleItemDto[];
 }

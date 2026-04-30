@@ -14,6 +14,7 @@ import { CreateStationDto } from './dto/create-station.dto';
 import { UpdateStationDto } from './dto/update-station.dto';
 import { CreateStationManagerDto } from './dto/create-station-manager.dto';
 import { CreateVehicleOwnerDto } from './dto/create-vehicle-owner.dto';
+import { AddOwnerVehiclesDto } from './dto/add-owner-vehicles.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { UpsertFuelPriceDto } from './dto/upsert-fuel-price.dto';
 import { CreateQuotaRuleDto } from './dto/create-quota-rule.dto';
@@ -232,15 +233,17 @@ export class AdminService {
           throw new BadRequestException('Failed to create user');
         }
 
-        await tx.insert(schema.vehicles).values(
-          dto.vehicles.map((v) => ({
-            ownerUserId: user.id,
-            plateNumber: v.plateNumber.trim(),
-            category: v.category,
-            label: v.label ?? null,
-            isActive: true,
-          })),
-        );
+        if (dto.vehicles?.length) {
+          await tx.insert(schema.vehicles).values(
+            dto.vehicles.map((v) => ({
+              ownerUserId: user.id,
+              plateNumber: v.plateNumber.trim(),
+              category: v.category,
+              label: v.label ?? null,
+              isActive: true,
+            })),
+          );
+        }
 
         const vehicleRows = await tx
           .select()
@@ -255,6 +258,47 @@ export class AdminService {
     } catch (e) {
       if (isPgUniqueViolation(e)) {
         throw new ConflictException('Email or vehicle plate already in use');
+      }
+      throw e;
+    }
+  }
+
+  async addVehiclesToOwner(ownerUserId: number, dto: AddOwnerVehiclesDto) {
+    try {
+      return await this.db.transaction(async (tx) => {
+        const [owner] = await tx
+          .select()
+          .from(schema.users)
+          .where(eq(schema.users.id, ownerUserId))
+          .limit(1);
+
+        if (!owner) {
+          throw new NotFoundException('User not found');
+        }
+        if (owner.role !== 'VEHICLE_OWNER') {
+          throw new BadRequestException('Target user is not a vehicle owner');
+        }
+
+        await tx.insert(schema.vehicles).values(
+          dto.vehicles.map((v) => ({
+            ownerUserId: owner.id,
+            plateNumber: v.plateNumber.trim(),
+            category: v.category,
+            label: v.label ?? null,
+            isActive: true,
+          })),
+        );
+
+        const vehicles = await tx
+          .select()
+          .from(schema.vehicles)
+          .where(eq(schema.vehicles.ownerUserId, owner.id));
+
+        return vehicles.map((v) => this.mapVehicle(v));
+      });
+    } catch (e) {
+      if (isPgUniqueViolation(e)) {
+        throw new ConflictException('Vehicle plate already in use');
       }
       throw e;
     }
