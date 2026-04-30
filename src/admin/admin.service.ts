@@ -18,6 +18,7 @@ import { AddOwnerVehiclesDto } from './dto/add-owner-vehicles.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { UpsertFuelPriceDto } from './dto/upsert-fuel-price.dto';
 import { CreateFuelTypeDto } from './dto/create-fuel-type.dto';
+import { CreateFuelTypeWithPriceDto } from './dto/create-fuel-type-with-price.dto';
 import { UpdateFuelTypeDto } from './dto/update-fuel-type.dto';
 import { ListFuelTypesDto } from './dto/list-fuel-types.dto';
 import { CreateVehicleCategoryDto } from './dto/create-vehicle-category.dto';
@@ -530,7 +531,20 @@ export class AdminService {
 
   async listFuelTypes(query: ListFuelTypesDto) {
     const includeInactive = query.includeInactive === true;
-    const base = this.db.select().from(schema.fuelTypes);
+    const base = this.db
+      .select({
+        id: schema.fuelTypes.id,
+        code: schema.fuelTypes.code,
+        name: schema.fuelTypes.name,
+        isActive: schema.fuelTypes.isActive,
+        createdAt: schema.fuelTypes.createdAt,
+        updatedAt: schema.fuelTypes.updatedAt,
+        pricePerLiter: schema.fuelPrices.pricePerLiter,
+        priceUpdatedAt: schema.fuelPrices.updatedAt,
+      })
+      .from(schema.fuelTypes)
+      .leftJoin(schema.fuelPrices, eq(schema.fuelPrices.fuelTypeId, schema.fuelTypes.id));
+    
     const rows = includeInactive
       ? await base
       : await base.where(eq(schema.fuelTypes.isActive, true));
@@ -540,9 +554,54 @@ export class AdminService {
       code: row.code,
       name: row.name,
       isActive: row.isActive,
+      pricePerLiter: row.pricePerLiter ? parseFloat(row.pricePerLiter) : null,
+      priceUpdatedAt: row.priceUpdatedAt ? row.priceUpdatedAt.toISOString() : null,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     }));
+  }
+
+  async createFuelTypeWithPrice(dto: CreateFuelTypeWithPriceDto) {
+    const code = String(dto.code ?? '').trim().toUpperCase();
+    const name = String(dto.name ?? '').trim();
+    if (!code) throw new BadRequestException('code is required');
+    if (!name) throw new BadRequestException('name is required');
+
+    return await this.db.transaction(async (tx) => {
+      try {
+        const [fuelType] = await tx
+          .insert(schema.fuelTypes)
+          .values({
+            code,
+            name,
+            isActive: dto.isActive ?? true,
+            updatedAt: new Date(),
+          })
+          .returning();
+
+        await tx.insert(schema.fuelPrices).values({
+          fuelTypeId: fuelType.id,
+          pricePerLiter: dto.pricePerLiter.toFixed(2),
+          isActive: true,
+          updatedAt: new Date(),
+        });
+
+        return {
+          id: fuelType.id,
+          code: fuelType.code,
+          name: fuelType.name,
+          isActive: fuelType.isActive,
+          pricePerLiter: dto.pricePerLiter,
+          createdAt: fuelType.createdAt.toISOString(),
+          updatedAt: fuelType.updatedAt.toISOString(),
+        };
+      } catch (e) {
+        if (isPgUniqueViolation(e)) {
+          throw new ConflictException('Fuel type code already exists');
+        }
+        throw e;
+      }
+    });
   }
 
   async createFuelType(dto: CreateFuelTypeDto) {
