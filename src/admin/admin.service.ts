@@ -70,7 +70,6 @@ export class AdminService {
       name: row.name,
       latitude: row.latitude ? parseFloat(row.latitude.toString()) : null,
       longitude: row.longitude ? parseFloat(row.longitude.toString()) : null,
-      city: row.city,
       phone: row.phone,
       isActive: row.isActive,
       queueIntakePaused: row.queueIntakePaused,
@@ -195,7 +194,6 @@ export class AdminService {
           name: dto.name,
           latitude: dto.latitude?.toString() ?? null,
           longitude: dto.longitude?.toString() ?? null,
-          city: dto.city ?? null,
           phone: dto.phone ?? null,
         })
         .returning();
@@ -224,7 +222,6 @@ export class AdminService {
     if (dto.name !== undefined) patch.name = dto.name;
     if (dto.latitude !== undefined) patch.latitude = dto.latitude.toString();
     if (dto.longitude !== undefined) patch.longitude = dto.longitude.toString();
-    if (dto.city !== undefined) patch.city = dto.city;
     if (dto.phone !== undefined) patch.phone = dto.phone;
     if (dto.remainingFuel !== undefined) patch.remainingFuel = dto.remainingFuel.toString();
     if (dto.isActive !== undefined) patch.isActive = dto.isActive;
@@ -616,7 +613,6 @@ export class AdminService {
         ? {
             id: station[0].id,
             name: station[0].name,
-            city: station[0].city,
             isActive: station[0].isActive,
           }
         : null,
@@ -1288,8 +1284,8 @@ export class AdminService {
           const station = stationMap.get(stationId) ?? null;
           return {
             station: station
-              ? { id: station.id, name: station.name, city: station.city }
-              : { id: stationId, name: null, city: null },
+              ? { id: station.id, name: station.name }
+              : { id: stationId, name: null },
             ...mapBucket(bucket),
           };
         })

@@ -58,7 +58,6 @@ export class StationManagerService {
       name: row.name,
       latitude: row.latitude ? parseFloat(row.latitude.toString()) : null,
       longitude: row.longitude ? parseFloat(row.longitude.toString()) : null,
-      city: row.city,
       phone: row.phone,
       isActive: row.isActive,
       queueIntakePaused: row.queueIntakePaused,
@@ -168,7 +167,6 @@ export class StationManagerService {
         station: {
           id: station.id,
           name: station.name,
-          city: station.city,
           isActive: station.isActive,
         },
       };

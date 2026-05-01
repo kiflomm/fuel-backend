@@ -55,7 +55,6 @@ export class QueueService {
       name: s.name,
       latitude: s.latitude,
       longitude: s.longitude,
-      city: s.city,
       phone: s.phone,
       isActive: s.isActive,
       queueIntakePaused: s.queueIntakePaused,

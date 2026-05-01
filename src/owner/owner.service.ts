@@ -147,7 +147,6 @@ export class OwnerService {
         name: string;
         latitude: string | null;
         longitude: string | null;
-        city: string | null;
         phone: string | null;
         isActive: boolean;
         queueIntakePaused: boolean;
@@ -202,7 +201,6 @@ export class OwnerService {
               name: station.name,
               latitude: station.latitude,
               longitude: station.longitude,
-              city: station.city,
               phone: station.phone,
               isActive: station.isActive,
               queueIntakePaused: station.queueIntakePaused,
@@ -303,7 +301,6 @@ export class OwnerService {
               name: station.name,
               latitude: station.latitude,
               longitude: station.longitude,
-              city: station.city,
               phone: station.phone,
             }
           : null,
@@ -385,7 +382,6 @@ export class OwnerService {
             name: station.name,
             latitude: station.latitude,
             longitude: station.longitude,
-            city: station.city,
             phone: station.phone,
           }
         : null,

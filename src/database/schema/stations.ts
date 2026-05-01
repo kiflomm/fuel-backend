@@ -15,7 +15,6 @@ export const stations = pgTable('stations', {
   name: text('name').notNull(),
   latitude: numeric('latitude', { precision: 10, scale: 8 }),
   longitude: numeric('longitude', { precision: 11, scale: 8 }),
-  city: text('city'),
   phone: text('phone'),
   isActive: boolean('is_active').notNull().default(true),
   queueIntakePaused: boolean('queue_intake_paused').notNull().default(false),

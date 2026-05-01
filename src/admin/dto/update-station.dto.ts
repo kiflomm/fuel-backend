@@ -25,11 +25,6 @@ export class UpdateStationDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  city?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
   phone?: string;
 
   @ApiPropertyOptional({

@@ -22,11 +22,6 @@ export class CreateStationDto {
   @IsNumber()
   longitude?: number;
 
-  @ApiPropertyOptional({ example: 'Mekelle' })
-  @IsOptional()
-  @IsString()
-  city?: string;
-
   @ApiPropertyOptional({ example: '+251...' })
   @IsOptional()
   @IsString()
