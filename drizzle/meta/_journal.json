@@ -43,6 +43,13 @@
       "when": 1777621472184,
       "tag": "0005_quick_grey_gargoyle",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1777622742602,
+      "tag": "0006_aberrant_newton_destine",
+      "breakpoints": true
     }
   ]
 }
