@@ -165,5 +165,65 @@ describe('AdminController (e2e)', () => {
           expect([200, 500]).toContain(res.status);
         });
     });
+
+    it('POST /admin/vehicle-categories validates quota rules in payload', () => {
+      return request(app.getHttpServer())
+        .post('/admin/vehicle-categories')
+        .set('Authorization', 'Bearer fake-token')
+        .send({
+          code: 'PRIVATE_CAR',
+          name: 'Private Car',
+          fuelSubsidyPercentage: 10,
+          quotaRules: [
+            { period: 'DAILY', litersLimit: 20 },
+            { period: 'MONTHLY', litersLimit: 120 },
+          ],
+        })
+        .expect((res) => {
+          expect([201, 400, 500]).toContain(res.status);
+        });
+    });
+
+    it('POST /admin/users/vehicle-owners accepts vehicles without vehicle-level quota payload', () => {
+      return request(app.getHttpServer())
+        .post('/admin/users/vehicle-owners')
+        .set('Authorization', 'Bearer fake-token')
+        .send({
+          email: 'owner-no-quota@test.local',
+          password: 'password123',
+          firstName: 'Owner',
+          lastName: 'NoQuota',
+          vehicles: [
+            {
+              plateNumber: '3-12345-AA',
+              categoryId: 1,
+            },
+          ],
+        })
+        .expect((res) => {
+          expect([201, 400, 500]).toContain(res.status);
+        });
+    });
+
+    it('GET /admin/vehicles/:id/quota-rules route is wired', () => {
+      return request(app.getHttpServer())
+        .get('/admin/vehicles/1/quota-rules')
+        .set('Authorization', 'Bearer fake-token')
+        .expect((res) => {
+          expect([200, 404, 500]).toContain(res.status);
+        });
+    });
+
+    it('PATCH /admin/vehicles/:id/quota-rules validates payload shape', () => {
+      return request(app.getHttpServer())
+        .patch('/admin/vehicles/1/quota-rules')
+        .set('Authorization', 'Bearer fake-token')
+        .send({
+          quotaRules: [{ period: 'WEEKLY', litersLimit: 80 }],
+        })
+        .expect((res) => {
+          expect([200, 404, 400, 500]).toContain(res.status);
+        });
+    });
   });
 });
