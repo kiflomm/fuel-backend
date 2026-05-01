@@ -32,28 +32,92 @@ export class OwnerService {
     return { fromDate, toDate };
   }
 
+  private mapVehicleRow(row: {
+    id: number;
+    plateNumber: string;
+    categoryId: number;
+    label: string | null;
+    isActive: boolean;
+    createdAt: Date;
+    updatedAt: Date;
+    categoryCode: string | null;
+    categoryName: string | null;
+    categoryDescription: string | null;
+    categoryFuelSubsidyPercentage: string | null;
+    categoryIsActive: boolean | null;
+  }) {
+    return {
+      id: row.id,
+      plateNumber: row.plateNumber,
+      categoryId: row.categoryId,
+      label: row.label,
+      isActive: row.isActive,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+      category:
+        row.categoryCode != null && row.categoryName != null
+          ? {
+              id: row.categoryId,
+              code: row.categoryCode,
+              name: row.categoryName,
+              description: row.categoryDescription,
+              fuelSubsidyPercentage: row.categoryFuelSubsidyPercentage,
+              isActive: row.categoryIsActive ?? true,
+            }
+          : null,
+    };
+  }
+
   async listVehicles(ownerUserId: number) {
     const rows = await this.db
-      .select()
+      .select({
+        id: schema.vehicles.id,
+        plateNumber: schema.vehicles.plateNumber,
+        categoryId: schema.vehicles.categoryId,
+        label: schema.vehicles.label,
+        isActive: schema.vehicles.isActive,
+        createdAt: schema.vehicles.createdAt,
+        updatedAt: schema.vehicles.updatedAt,
+        categoryCode: schema.vehicleCategories.code,
+        categoryName: schema.vehicleCategories.name,
+        categoryDescription: schema.vehicleCategories.description,
+        categoryFuelSubsidyPercentage:
+          schema.vehicleCategories.fuelSubsidyPercentage,
+        categoryIsActive: schema.vehicleCategories.isActive,
+      })
       .from(schema.vehicles)
+      .leftJoin(
+        schema.vehicleCategories,
+        eq(schema.vehicles.categoryId, schema.vehicleCategories.id),
+      )
       .where(eq(schema.vehicles.ownerUserId, ownerUserId))
       .orderBy(desc(schema.vehicles.createdAt));
 
-    return rows.map((v) => ({
-      id: v.id,
-      plateNumber: v.plateNumber,
-      categoryId: v.categoryId,
-      label: v.label,
-      isActive: v.isActive,
-      createdAt: v.createdAt.toISOString(),
-      updatedAt: v.updatedAt.toISOString(),
-    }));
+    return rows.map((row) => this.mapVehicleRow(row));
   }
 
   async getVehicle(ownerUserId: number, vehicleId: number) {
     const [vehicle] = await this.db
-      .select()
+      .select({
+        id: schema.vehicles.id,
+        plateNumber: schema.vehicles.plateNumber,
+        categoryId: schema.vehicles.categoryId,
+        label: schema.vehicles.label,
+        isActive: schema.vehicles.isActive,
+        createdAt: schema.vehicles.createdAt,
+        updatedAt: schema.vehicles.updatedAt,
+        categoryCode: schema.vehicleCategories.code,
+        categoryName: schema.vehicleCategories.name,
+        categoryDescription: schema.vehicleCategories.description,
+        categoryFuelSubsidyPercentage:
+          schema.vehicleCategories.fuelSubsidyPercentage,
+        categoryIsActive: schema.vehicleCategories.isActive,
+      })
       .from(schema.vehicles)
+      .leftJoin(
+        schema.vehicleCategories,
+        eq(schema.vehicles.categoryId, schema.vehicleCategories.id),
+      )
       .where(
         and(
           eq(schema.vehicles.id, vehicleId),
@@ -66,15 +130,7 @@ export class OwnerService {
       throw new NotFoundException('Vehicle not found');
     }
 
-    return {
-      id: vehicle.id,
-      plateNumber: vehicle.plateNumber,
-      categoryId: vehicle.categoryId,
-      label: vehicle.label,
-      isActive: vehicle.isActive,
-      createdAt: vehicle.createdAt.toISOString(),
-      updatedAt: vehicle.updatedAt.toISOString(),
-    };
+    return this.mapVehicleRow(vehicle);
   }
 
   async getVehicleQuota(ownerUserId: number, vehicleId: number) {
