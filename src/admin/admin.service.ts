@@ -27,6 +27,7 @@ import { ListVehicleCategoriesDto } from './dto/list-vehicle-categories.dto';
 import { AdminDailyTotalsQueryDto } from './dto/admin-daily-totals-query.dto';
 import { AdminServiceActivityQueryDto } from './dto/admin-service-activity-query.dto';
 import { AdminDistributionQueryDto } from './dto/admin-distribution-query.dto';
+import { QuotaRuleItemDto } from './dto/quota-rule-item.dto';
 import { desc, gte, inArray, lte } from 'drizzle-orm';
 
 function isPgUniqueViolation(error: unknown): boolean {
@@ -105,13 +106,24 @@ export class AdminService {
     };
   }
 
-  private mapVehicleCategory(row: typeof schema.vehicleCategories.$inferSelect) {
+  private mapVehicleCategory(
+    row: typeof schema.vehicleCategories.$inferSelect,
+    quotaRules: Array<typeof schema.vehicleCategoryQuotaRules.$inferSelect> = [],
+  ) {
     return {
       id: row.id,
       code: row.code,
       name: row.name,
       description: row.description,
       fuelSubsidyPercentage: row.fuelSubsidyPercentage,
+      quotaRules: quotaRules.map((rule) => ({
+        id: rule.id,
+        period: rule.period,
+        litersLimit: rule.litersLimit,
+        isActive: rule.isActive,
+        createdAt: rule.createdAt.toISOString(),
+        updatedAt: rule.updatedAt.toISOString(),
+      })),
       isActive: row.isActive,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
@@ -138,6 +150,41 @@ export class AdminService {
       grouped.set(rule.vehicleId, existing);
     }
     return grouped;
+  }
+
+  private async getCategoryQuotaRulesByCategoryIds(categoryIds: number[]) {
+    if (categoryIds.length === 0) {
+      return new Map<number, Array<typeof schema.vehicleCategoryQuotaRules.$inferSelect>>();
+    }
+    const rules = await this.db
+      .select()
+      .from(schema.vehicleCategoryQuotaRules)
+      .where(inArray(schema.vehicleCategoryQuotaRules.categoryId, categoryIds));
+    const grouped = new Map<number, Array<typeof schema.vehicleCategoryQuotaRules.$inferSelect>>();
+    for (const rule of rules) {
+      const existing = grouped.get(rule.categoryId) ?? [];
+      existing.push(rule);
+      grouped.set(rule.categoryId, existing);
+    }
+    return grouped;
+  }
+
+  private async replaceVehicleQuotaRulesForVehicle(
+    vehicleId: number,
+    quotaRules: QuotaRuleItemDto[],
+  ) {
+    await this.db
+      .delete(schema.vehicleQuotaRules)
+      .where(eq(schema.vehicleQuotaRules.vehicleId, vehicleId));
+
+    await this.db.insert(schema.vehicleQuotaRules).values(
+      quotaRules.map((quotaRule) => ({
+        vehicleId,
+        period: quotaRule.period,
+        litersLimit: quotaRule.litersLimit.toFixed(2),
+        isActive: quotaRule.isActive ?? true,
+      })),
+    );
   }
 
   async createStation(dto: CreateStationDto) {
@@ -268,6 +315,19 @@ export class AdminService {
             .from(schema.vehicleCategories)
             .where(inArray(schema.vehicleCategories.id, categoryIds));
           const categoryMap = new Map(categories.map((item) => [item.id, item] as const));
+          const categoryQuotaRules = await tx
+            .select()
+            .from(schema.vehicleCategoryQuotaRules)
+            .where(inArray(schema.vehicleCategoryQuotaRules.categoryId, categoryIds));
+          const categoryQuotaRulesByCategoryId = new Map<
+            number,
+            Array<typeof schema.vehicleCategoryQuotaRules.$inferSelect>
+          >();
+          for (const rule of categoryQuotaRules) {
+            const existing = categoryQuotaRulesByCategoryId.get(rule.categoryId) ?? [];
+            existing.push(rule);
+            categoryQuotaRulesByCategoryId.set(rule.categoryId, existing);
+          }
           for (const categoryId of categoryIds) {
             const category = categoryMap.get(categoryId);
             if (!category) {
@@ -275,6 +335,12 @@ export class AdminService {
             }
             if (!category.isActive) {
               throw new BadRequestException(`Vehicle category ${category.code} is inactive`);
+            }
+            const rules = categoryQuotaRulesByCategoryId.get(categoryId) ?? [];
+            if (rules.length === 0) {
+              throw new BadRequestException(
+                `Vehicle category ${category.code} has no quota rules configured`,
+              );
             }
           }
         }
@@ -310,20 +376,37 @@ export class AdminService {
             )
             .returning();
 
-          const payloadByPlate = new Map(dto.vehicles.map((item) => [item.plateNumber.trim(), item]));
-          for (const insertedVehicle of insertedVehicles) {
-            const payload = payloadByPlate.get(insertedVehicle.plateNumber);
-            if (!payload) {
-              continue;
-            }
-            await tx.insert(schema.vehicleQuotaRules).values(
-              payload.quotaRules.map((quotaRule) => ({
-                vehicleId: insertedVehicle.id,
-                period: quotaRule.period,
-                litersLimit: quotaRule.litersLimit.toFixed(2),
-                isActive: quotaRule.isActive ?? true,
-              })),
+          const categoryQuotaRules = await tx
+            .select()
+            .from(schema.vehicleCategoryQuotaRules)
+            .where(
+              inArray(
+                schema.vehicleCategoryQuotaRules.categoryId,
+                insertedVehicles.map((vehicle) => vehicle.categoryId),
+              ),
             );
+          const categoryQuotaRulesByCategoryId = new Map<
+            number,
+            Array<typeof schema.vehicleCategoryQuotaRules.$inferSelect>
+          >();
+          for (const rule of categoryQuotaRules) {
+            const existing = categoryQuotaRulesByCategoryId.get(rule.categoryId) ?? [];
+            existing.push(rule);
+            categoryQuotaRulesByCategoryId.set(rule.categoryId, existing);
+          }
+
+          const vehicleRulesToInsert = insertedVehicles.flatMap((insertedVehicle) => {
+            const rules = categoryQuotaRulesByCategoryId.get(insertedVehicle.categoryId) ?? [];
+            return rules.map((rule) => ({
+              vehicleId: insertedVehicle.id,
+              period: rule.period,
+              litersLimit: rule.litersLimit,
+              isActive: rule.isActive,
+            }));
+          });
+
+          if (vehicleRulesToInsert.length > 0) {
+            await tx.insert(schema.vehicleQuotaRules).values(vehicleRulesToInsert);
           }
         }
 
@@ -376,6 +459,19 @@ export class AdminService {
           .from(schema.vehicleCategories)
           .where(inArray(schema.vehicleCategories.id, categoryIds));
         const categoryMap = new Map(categories.map((item) => [item.id, item] as const));
+        const categoryQuotaRules = await tx
+          .select()
+          .from(schema.vehicleCategoryQuotaRules)
+          .where(inArray(schema.vehicleCategoryQuotaRules.categoryId, categoryIds));
+        const categoryQuotaRulesByCategoryId = new Map<
+          number,
+          Array<typeof schema.vehicleCategoryQuotaRules.$inferSelect>
+        >();
+        for (const rule of categoryQuotaRules) {
+          const existing = categoryQuotaRulesByCategoryId.get(rule.categoryId) ?? [];
+          existing.push(rule);
+          categoryQuotaRulesByCategoryId.set(rule.categoryId, existing);
+        }
         for (const categoryId of categoryIds) {
           const category = categoryMap.get(categoryId);
           if (!category) {
@@ -383,6 +479,12 @@ export class AdminService {
           }
           if (!category.isActive) {
             throw new BadRequestException(`Vehicle category ${category.code} is inactive`);
+          }
+          const rules = categoryQuotaRulesByCategoryId.get(categoryId) ?? [];
+          if (rules.length === 0) {
+            throw new BadRequestException(
+              `Vehicle category ${category.code} has no quota rules configured`,
+            );
           }
         }
 
@@ -399,20 +501,17 @@ export class AdminService {
           )
           .returning();
 
-        const payloadByPlate = new Map(dto.vehicles.map((item) => [item.plateNumber.trim(), item]));
-        for (const insertedVehicle of insertedVehicles) {
-          const payload = payloadByPlate.get(insertedVehicle.plateNumber);
-          if (!payload) {
-            continue;
-          }
-          await tx.insert(schema.vehicleQuotaRules).values(
-            payload.quotaRules.map((quotaRule) => ({
-              vehicleId: insertedVehicle.id,
-              period: quotaRule.period,
-              litersLimit: quotaRule.litersLimit.toFixed(2),
-              isActive: quotaRule.isActive ?? true,
-            })),
-          );
+        const vehicleRulesToInsert = insertedVehicles.flatMap((insertedVehicle) => {
+          const rules = categoryQuotaRulesByCategoryId.get(insertedVehicle.categoryId) ?? [];
+          return rules.map((rule) => ({
+            vehicleId: insertedVehicle.id,
+            period: rule.period,
+            litersLimit: rule.litersLimit,
+            isActive: rule.isActive,
+          }));
+        });
+        if (vehicleRulesToInsert.length > 0) {
+          await tx.insert(schema.vehicleQuotaRules).values(vehicleRulesToInsert);
         }
 
         const vehicles = await tx
@@ -529,6 +628,45 @@ export class AdminService {
         ),
       ),
     };
+  }
+
+  async listVehicleQuotaRules(vehicleId: number) {
+    const [vehicle] = await this.db
+      .select({ id: schema.vehicles.id })
+      .from(schema.vehicles)
+      .where(eq(schema.vehicles.id, vehicleId))
+      .limit(1);
+    if (!vehicle) {
+      throw new NotFoundException('Vehicle not found');
+    }
+
+    const rows = await this.db
+      .select()
+      .from(schema.vehicleQuotaRules)
+      .where(eq(schema.vehicleQuotaRules.vehicleId, vehicleId));
+
+    return rows.map((rule) => ({
+      id: rule.id,
+      period: rule.period,
+      litersLimit: rule.litersLimit,
+      isActive: rule.isActive,
+      createdAt: rule.createdAt.toISOString(),
+      updatedAt: rule.updatedAt.toISOString(),
+    }));
+  }
+
+  async updateVehicleQuotaRules(vehicleId: number, quotaRules: QuotaRuleItemDto[]) {
+    const [vehicle] = await this.db
+      .select({ id: schema.vehicles.id })
+      .from(schema.vehicles)
+      .where(eq(schema.vehicles.id, vehicleId))
+      .limit(1);
+    if (!vehicle) {
+      throw new NotFoundException('Vehicle not found');
+    }
+
+    await this.replaceVehicleQuotaRulesForVehicle(vehicleId, quotaRules);
+    return this.listVehicleQuotaRules(vehicleId);
   }
 
   async listFuelTypes(query: ListFuelTypesDto) {
@@ -838,21 +976,38 @@ export class AdminService {
     if (!code) throw new BadRequestException('code is required');
     if (!name) throw new BadRequestException('name is required');
     try {
-      const [row] = await this.db
-        .insert(schema.vehicleCategories)
-        .values({
-          code,
-          name,
-          description: dto.description?.trim() || null,
-          fuelSubsidyPercentage:
-            dto.fuelSubsidyPercentage !== undefined
-              ? dto.fuelSubsidyPercentage.toFixed(2)
-              : '0.00',
-          isActive: dto.isActive ?? true,
-          updatedAt: new Date(),
-        })
-        .returning();
-      return this.mapVehicleCategory(row);
+      return await this.db.transaction(async (tx) => {
+        const [row] = await tx
+          .insert(schema.vehicleCategories)
+          .values({
+            code,
+            name,
+            description: dto.description?.trim() || null,
+            fuelSubsidyPercentage:
+              dto.fuelSubsidyPercentage !== undefined
+                ? dto.fuelSubsidyPercentage.toFixed(2)
+                : '0.00',
+            isActive: dto.isActive ?? true,
+            updatedAt: new Date(),
+          })
+          .returning();
+
+        await tx.insert(schema.vehicleCategoryQuotaRules).values(
+          dto.quotaRules.map((quotaRule) => ({
+            categoryId: row.id,
+            period: quotaRule.period,
+            litersLimit: quotaRule.litersLimit.toFixed(2),
+            isActive: quotaRule.isActive ?? true,
+          })),
+        );
+
+        const categoryRules = await tx
+          .select()
+          .from(schema.vehicleCategoryQuotaRules)
+          .where(eq(schema.vehicleCategoryQuotaRules.categoryId, row.id));
+
+        return this.mapVehicleCategory(row, categoryRules);
+      });
     } catch (e) {
       if (isPgUniqueViolation(e)) {
         throw new ConflictException('Vehicle category code already exists');
@@ -867,7 +1022,12 @@ export class AdminService {
     const rows = includeInactive
       ? await base
       : await base.where(eq(schema.vehicleCategories.isActive, true));
-    return rows.map((row) => this.mapVehicleCategory(row));
+    const categoryQuotaRulesByCategoryId = await this.getCategoryQuotaRulesByCategoryIds(
+      rows.map((row) => row.id),
+    );
+    return rows.map((row) =>
+      this.mapVehicleCategory(row, categoryQuotaRulesByCategoryId.get(row.id) ?? []),
+    );
   }
 
   async getVehicleCategoryById(id: number) {
@@ -879,7 +1039,8 @@ export class AdminService {
     if (!row) {
       throw new NotFoundException('Vehicle category not found');
     }
-    return this.mapVehicleCategory(row);
+    const categoryQuotaRulesByCategoryId = await this.getCategoryQuotaRulesByCategoryIds([id]);
+    return this.mapVehicleCategory(row, categoryQuotaRulesByCategoryId.get(id) ?? []);
   }
 
   async updateVehicleCategory(id: number, dto: UpdateVehicleCategoryDto) {
@@ -902,12 +1063,35 @@ export class AdminService {
     }
     if (dto.isActive !== undefined) patch.isActive = dto.isActive;
     try {
-      const [row] = await this.db
-        .update(schema.vehicleCategories)
-        .set(patch)
-        .where(eq(schema.vehicleCategories.id, id))
-        .returning();
-      return this.mapVehicleCategory(row);
+      return await this.db.transaction(async (tx) => {
+        const [row] = await tx
+          .update(schema.vehicleCategories)
+          .set(patch)
+          .where(eq(schema.vehicleCategories.id, id))
+          .returning();
+
+        if (dto.quotaRules) {
+          await tx
+            .delete(schema.vehicleCategoryQuotaRules)
+            .where(eq(schema.vehicleCategoryQuotaRules.categoryId, id));
+
+          await tx.insert(schema.vehicleCategoryQuotaRules).values(
+            dto.quotaRules.map((quotaRule) => ({
+              categoryId: id,
+              period: quotaRule.period,
+              litersLimit: quotaRule.litersLimit.toFixed(2),
+              isActive: quotaRule.isActive ?? true,
+            })),
+          );
+        }
+
+        const categoryRules = await tx
+          .select()
+          .from(schema.vehicleCategoryQuotaRules)
+          .where(eq(schema.vehicleCategoryQuotaRules.categoryId, id));
+
+        return this.mapVehicleCategory(row, categoryRules);
+      });
     } catch (e) {
       if (isPgUniqueViolation(e)) {
         throw new ConflictException('Vehicle category code already exists');

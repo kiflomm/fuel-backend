@@ -44,6 +44,7 @@ import { ListVehicleCategoriesDto } from './dto/list-vehicle-categories.dto';
 import { AdminDailyTotalsQueryDto } from './dto/admin-daily-totals-query.dto';
 import { AdminServiceActivityQueryDto } from './dto/admin-service-activity-query.dto';
 import { AdminDistributionQueryDto } from './dto/admin-distribution-query.dto';
+import { UpdateVehicleQuotaRulesDto } from './dto/update-vehicle-quota-rules.dto';
 
 @ApiTags('Admin')
 @ApiBearerAuth('JWT-auth')
@@ -191,6 +192,35 @@ export class AdminController {
     return {
       success: true,
       message: 'User retrieved',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Get('vehicles/:id/quota-rules')
+  @ApiOperation({ summary: 'Get manual quota rules configured for a vehicle' })
+  @ApiOkResponse({ description: 'Vehicle quota rules retrieved' })
+  async getVehicleQuotaRules(@Param('id', ParseIntPipe) id: number) {
+    const data = await this.adminService.listVehicleQuotaRules(id);
+    return {
+      success: true,
+      message: 'Vehicle quota rules retrieved',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Patch('vehicles/:id/quota-rules')
+  @ApiOperation({ summary: 'Replace manual quota rules configured for a vehicle' })
+  @ApiOkResponse({ description: 'Vehicle quota rules updated' })
+  async updateVehicleQuotaRules(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateVehicleQuotaRulesDto,
+  ) {
+    const data = await this.adminService.updateVehicleQuotaRules(id, dto.quotaRules);
+    return {
+      success: true,
+      message: 'Vehicle quota rules updated',
       data,
       timestamp: new Date().toISOString(),
     };

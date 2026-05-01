@@ -1,6 +1,8 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  ArrayMinSize,
+  IsArray,
   IsBoolean,
   IsNotEmpty,
   IsNumber,
@@ -8,7 +10,9 @@ import {
   IsString,
   Max,
   Min,
+  ValidateNested,
 } from 'class-validator';
+import { QuotaRuleItemDto } from './quota-rule-item.dto';
 
 export class UpdateVehicleCategoryDto {
   @ApiPropertyOptional()
@@ -42,4 +46,12 @@ export class UpdateVehicleCategoryDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @ApiPropertyOptional({ type: [QuotaRuleItemDto] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => QuotaRuleItemDto)
+  quotaRules?: QuotaRuleItemDto[];
 }

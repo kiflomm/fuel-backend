@@ -7,6 +7,7 @@ export * from './enums';
 export * from './schema/stations';
 export * from './schema/users';
 export * from './schema/vehicle-categories';
+export * from './schema/vehicle-category-quota-rules';
 export * from './schema/vehicles';
 export * from './schema/vehicle-quota-rules';
 export * from './schema/vehicle-quota-balances';
