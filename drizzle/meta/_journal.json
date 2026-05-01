@@ -29,6 +29,13 @@
       "when": 1777577967319,
       "tag": "0003_plain_hellcat",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1777617256160,
+      "tag": "0004_useful_nebula",
+      "breakpoints": true
     }
   ]
 }

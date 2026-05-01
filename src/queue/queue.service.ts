@@ -53,12 +53,13 @@ export class QueueService {
     return rows.map((s) => ({
       id: s.id,
       name: s.name,
-      address: s.address,
+      latitude: s.latitude,
+      longitude: s.longitude,
       city: s.city,
       phone: s.phone,
       isActive: s.isActive,
       queueIntakePaused: s.queueIntakePaused,
-      fuelStatus: s.fuelStatus,
+      remainingFuel: s.remainingFuel,
       activeQueueLength: countMap.get(s.id) ?? 0,
     }));
   }
@@ -130,10 +131,6 @@ export class QueueService {
     if (station.queueIntakePaused) {
       throw new BadRequestException('This station is not accepting new queue entries');
     }
-    if (station.fuelStatus === 'UNAVAILABLE') {
-      throw new BadRequestException('Station has no fuel available');
-    }
-
     if (!Number.isFinite(dto.litersRequested) || dto.litersRequested <= 0) {
       throw new BadRequestException('Invalid litersRequested');
     }
@@ -409,9 +406,6 @@ export class QueueService {
     }
     if (station.queueIntakePaused) {
       throw new BadRequestException('This station is not accepting new queue entries');
-    }
-    if (station.fuelStatus === 'UNAVAILABLE') {
-      throw new BadRequestException('Station has no fuel available');
     }
 
     await this.quotaService.assertVehicleHasAtLeast(

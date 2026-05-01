@@ -3,10 +3,8 @@ import {
   IsBoolean,
   IsOptional,
   IsString,
-  IsIn,
+  IsNumber,
 } from 'class-validator';
-import type { StationFuelStatus } from '../../database/enums';
-import { STATION_FUEL_STATUSES } from '../../database/enums';
 
 export class UpdateStationDto {
   @ApiPropertyOptional()
@@ -16,8 +14,13 @@ export class UpdateStationDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsString()
-  address?: string;
+  @IsNumber()
+  latitude?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  longitude?: number;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -29,10 +32,12 @@ export class UpdateStationDto {
   @IsString()
   phone?: string;
 
-  @ApiPropertyOptional({ enum: STATION_FUEL_STATUSES })
+  @ApiPropertyOptional({
+    description: 'Remaining fuel in liters',
+  })
   @IsOptional()
-  @IsIn(STATION_FUEL_STATUSES)
-  fuelStatus?: StationFuelStatus;
+  @IsNumber()
+  remainingFuel?: number;
 
   @ApiPropertyOptional()
   @IsOptional()

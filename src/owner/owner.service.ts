@@ -145,12 +145,13 @@ export class OwnerService {
       station: {
         id: number;
         name: string;
-        address: string | null;
+        latitude: string | null;
+        longitude: string | null;
         city: string | null;
         phone: string | null;
         isActive: boolean;
         queueIntakePaused: boolean;
-        fuelStatus: typeof schema.stations.$inferSelect.fuelStatus;
+        remainingFuel: string | null;
       } | null;
       vehicle: {
         id: number;
@@ -199,12 +200,13 @@ export class OwnerService {
           ? {
               id: station.id,
               name: station.name,
-              address: station.address,
+              latitude: station.latitude,
+              longitude: station.longitude,
               city: station.city,
               phone: station.phone,
               isActive: station.isActive,
               queueIntakePaused: station.queueIntakePaused,
-              fuelStatus: station.fuelStatus,
+              remainingFuel: station.remainingFuel,
             }
           : null,
         vehicle: vehicle
@@ -299,8 +301,9 @@ export class OwnerService {
           ? {
               id: station.id,
               name: station.name,
+              latitude: station.latitude,
+              longitude: station.longitude,
               city: station.city,
-              address: station.address,
               phone: station.phone,
             }
           : null,
@@ -380,8 +383,9 @@ export class OwnerService {
         ? {
             id: station.id,
             name: station.name,
+            latitude: station.latitude,
+            longitude: station.longitude,
             city: station.city,
-            address: station.address,
             phone: station.phone,
           }
         : null,
