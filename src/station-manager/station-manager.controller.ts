@@ -26,6 +26,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
 import { StationManagerService } from './station-manager.service';
+import { AuditAction } from '../audit/audit-action.decorator';
 import { CreateStationWorkerDto } from './dto/create-station-worker.dto';
 import { UpdateStationWorkerDto } from './dto/update-station-worker.dto';
 import { UpdateStationWorkerStatusDto } from './dto/update-station-worker-status.dto';
@@ -60,6 +61,7 @@ export class StationManagerController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a station worker account for your station' })
   @ApiCreatedResponse({ description: 'Station worker created' })
+  @AuditAction('CREATE_STATION_WORKER', 'users')
   async createStationWorker(
     @CurrentUser() user: CurrentUserPayload,
     @Body() dto: CreateStationWorkerDto,
@@ -105,6 +107,7 @@ export class StationManagerController {
   @Patch('users/station-workers/:id')
   @ApiOperation({ summary: 'Update a station worker account for your station' })
   @ApiOkResponse({ description: 'Station worker updated' })
+  @AuditAction('UPDATE_STATION_WORKER', 'users')
   async updateStationWorker(
     @CurrentUser() user: CurrentUserPayload,
     @Param('id', ParseIntPipe) id: number,
@@ -126,6 +129,7 @@ export class StationManagerController {
   @Patch('users/station-workers/:id/status')
   @ApiOperation({ summary: 'Activate or suspend a station worker account' })
   @ApiOkResponse({ description: 'Station worker status updated' })
+  @AuditAction('UPDATE_STATION_WORKER_STATUS', 'users')
   async updateStationWorkerStatus(
     @CurrentUser() user: CurrentUserPayload,
     @Param('id', ParseIntPipe) id: number,
@@ -160,6 +164,7 @@ export class StationManagerController {
   @Patch('queue/intake/pause')
   @ApiOperation({ summary: 'Pause queue intake for your station' })
   @ApiOkResponse({ description: 'Queue intake paused' })
+  @AuditAction('PAUSE_QUEUE_INTAKE', 'stations')
   async pauseQueueIntake(@CurrentUser() user: CurrentUserPayload) {
     const data = await this.stationManagerService.setQueueIntakePaused(
       user.id,
@@ -176,6 +181,7 @@ export class StationManagerController {
   @Patch('queue/intake/resume')
   @ApiOperation({ summary: 'Resume queue intake for your station' })
   @ApiOkResponse({ description: 'Queue intake resumed' })
+  @AuditAction('RESUME_QUEUE_INTAKE', 'stations')
   async resumeQueueIntake(@CurrentUser() user: CurrentUserPayload) {
     const data = await this.stationManagerService.setQueueIntakePaused(
       user.id,
@@ -192,6 +198,7 @@ export class StationManagerController {
   @Patch('station/fuel-status')
   @ApiOperation({ summary: 'Update fuel availability status for your station' })
   @ApiOkResponse({ description: 'Station fuel status updated' })
+  @AuditAction('UPDATE_STATION_FUEL_STATUS', 'stations')
   async updateFuelStatus(
     @CurrentUser() user: CurrentUserPayload,
     @Body() dto: UpdateStationFuelStatusDto,

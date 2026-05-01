@@ -22,6 +22,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
 import { QueueService } from './queue.service';
+import { AuditAction } from '../audit/audit-action.decorator';
 import { InitiatePaymentDto } from './dto/initiate-payment.dto';
 import { VerifyPaymentDto } from './dto/verify-payment.dto';
 import { JoinQueueDto } from './dto/join-queue.dto';
@@ -70,6 +71,7 @@ export class QueueController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Start Chapa payment before joining a queue' })
   @ApiCreatedResponse({ description: 'Payment created; open checkoutUrl' })
+  @AuditAction('INITIATE_PAYMENT', 'payments')
   async initiatePayment(
     @CurrentUser() user: CurrentUserPayload,
     @Body() dto: InitiatePaymentDto,
@@ -89,6 +91,7 @@ export class QueueController {
     summary: 'Verify Chapa payment with tx_ref (after redirect or poll)',
   })
   @ApiOkResponse({ description: 'Payment verified' })
+  @AuditAction('VERIFY_PAYMENT', 'payments')
   async verifyPayment(
     @CurrentUser() user: CurrentUserPayload,
     @Body() dto: VerifyPaymentDto,
@@ -108,6 +111,7 @@ export class QueueController {
     summary: 'Join queue after successful payment and valid quota',
   })
   @ApiCreatedResponse({ description: 'Joined queue' })
+  @AuditAction('JOIN_QUEUE', 'queue_bookings')
   async joinQueue(
     @CurrentUser() user: CurrentUserPayload,
     @Body() dto: JoinQueueDto,
