@@ -56,12 +56,13 @@ export class StationManagerService {
     return {
       id: row.id,
       name: row.name,
-      address: row.address,
+      latitude: row.latitude ? parseFloat(row.latitude.toString()) : null,
+      longitude: row.longitude ? parseFloat(row.longitude.toString()) : null,
       city: row.city,
       phone: row.phone,
       isActive: row.isActive,
       queueIntakePaused: row.queueIntakePaused,
-      fuelStatus: row.fuelStatus,
+      remainingFuel: row.remainingFuel ? parseFloat(row.remainingFuel.toString()) : null,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };
@@ -365,7 +366,7 @@ export class StationManagerService {
     const [updated] = await this.db
       .update(schema.stations)
       .set({
-        fuelStatus: dto.fuelStatus,
+        remainingFuel: dto.remainingFuel.toString(),
         updatedAt: new Date(),
       })
       .where(eq(schema.stations.id, station.id))

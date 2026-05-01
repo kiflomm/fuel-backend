@@ -67,12 +67,13 @@ export class AdminService {
     return {
       id: row.id,
       name: row.name,
-      address: row.address,
+      latitude: row.latitude ? parseFloat(row.latitude.toString()) : null,
+      longitude: row.longitude ? parseFloat(row.longitude.toString()) : null,
       city: row.city,
       phone: row.phone,
       isActive: row.isActive,
       queueIntakePaused: row.queueIntakePaused,
-      fuelStatus: row.fuelStatus,
+      remainingFuel: row.remainingFuel ? parseFloat(row.remainingFuel.toString()) : null,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };
@@ -145,10 +146,10 @@ export class AdminService {
         .insert(schema.stations)
         .values({
           name: dto.name,
-          address: dto.address ?? null,
+          latitude: dto.latitude?.toString() ?? null,
+          longitude: dto.longitude?.toString() ?? null,
           city: dto.city ?? null,
           phone: dto.phone ?? null,
-          fuelStatus: dto.fuelStatus ?? 'AVAILABLE',
         })
         .returning();
       return this.mapStation(row);
@@ -174,10 +175,11 @@ export class AdminService {
       updatedAt: new Date(),
     };
     if (dto.name !== undefined) patch.name = dto.name;
-    if (dto.address !== undefined) patch.address = dto.address;
+    if (dto.latitude !== undefined) patch.latitude = dto.latitude.toString();
+    if (dto.longitude !== undefined) patch.longitude = dto.longitude.toString();
     if (dto.city !== undefined) patch.city = dto.city;
     if (dto.phone !== undefined) patch.phone = dto.phone;
-    if (dto.fuelStatus !== undefined) patch.fuelStatus = dto.fuelStatus;
+    if (dto.remainingFuel !== undefined) patch.remainingFuel = dto.remainingFuel.toString();
     if (dto.isActive !== undefined) patch.isActive = dto.isActive;
     if (dto.queueIntakePaused !== undefined)
       patch.queueIntakePaused = dto.queueIntakePaused;
