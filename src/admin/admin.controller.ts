@@ -27,6 +27,8 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
 import { AdminService } from './admin.service';
+import { AuditService } from '../audit/audit.service';
+import { AuditAction } from '../audit/audit-action.decorator';
 import { CreateStationDto } from './dto/create-station.dto';
 import { UpdateStationDto } from './dto/update-station.dto';
 import { CreateStationManagerDto } from './dto/create-station-manager.dto';
@@ -54,7 +56,10 @@ import { UpdateVehicleQuotaRulesDto } from './dto/update-vehicle-quota-rules.dto
 @Roles('GOVERNMENT_ADMIN')
 @Controller('admin')
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly auditService: AuditService,
+  ) {}
 
   @Get('health')
   @ApiOperation({ summary: 'Verify admin authentication' })
@@ -72,6 +77,7 @@ export class AdminController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a fuel station' })
   @ApiCreatedResponse({ description: 'Station created' })
+  @AuditAction('CREATE_STATION', 'stations')
   async createStation(@Body() dto: CreateStationDto) {
     const data = await this.adminService.createStation(dto);
     return {
@@ -85,6 +91,7 @@ export class AdminController {
   @Patch('stations/:id')
   @ApiOperation({ summary: 'Update a fuel station' })
   @ApiOkResponse({ description: 'Station updated' })
+  @AuditAction('UPDATE_STATION', 'stations')
   async updateStation(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateStationDto,
@@ -128,6 +135,7 @@ export class AdminController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a station manager account' })
   @ApiCreatedResponse({ description: 'Station manager created' })
+  @AuditAction('CREATE_STATION_MANAGER', 'users')
   async createStationManager(@Body() dto: CreateStationManagerDto) {
     const data = await this.adminService.createStationManager(dto);
     return {
@@ -144,6 +152,7 @@ export class AdminController {
     summary: 'Create a vehicle owner account with one or more vehicles',
   })
   @ApiCreatedResponse({ description: 'Vehicle owner and vehicles created' })
+  @AuditAction('CREATE_VEHICLE_OWNER', 'users')
   async createVehicleOwner(@Body() dto: CreateVehicleOwnerDto) {
     const data = await this.adminService.createVehicleOwner(dto);
     return {
@@ -158,6 +167,7 @@ export class AdminController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Add one or more vehicles to an existing vehicle owner' })
   @ApiCreatedResponse({ description: 'Vehicles added to owner' })
+  @AuditAction('ADD_VEHICLES_TO_OWNER', 'vehicles')
   async addVehiclesToOwner(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: AddOwnerVehiclesDto,
@@ -213,6 +223,7 @@ export class AdminController {
   @Patch('vehicles/:id/quota-rules')
   @ApiOperation({ summary: 'Replace manual quota rules configured for a vehicle' })
   @ApiOkResponse({ description: 'Vehicle quota rules updated' })
+  @AuditAction('UPDATE_VEHICLE_QUOTA_RULES', 'vehicle_quota_rules')
   async updateVehicleQuotaRules(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateVehicleQuotaRulesDto,
@@ -229,6 +240,7 @@ export class AdminController {
   @Patch('users/:id')
   @ApiOperation({ summary: 'Activate or suspend a user account' })
   @ApiOkResponse({ description: 'User status updated' })
+  @AuditAction('UPDATE_USER_STATUS', 'users')
   async updateUserStatus(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateUserStatusDto,
@@ -260,6 +272,7 @@ export class AdminController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a fuel type with price' })
   @ApiCreatedResponse({ description: 'Fuel type and price created' })
+  @AuditAction('CREATE_FUEL_TYPE', 'fuel_types')
   async createFuelTypeWithPrice(@Body() dto: CreateFuelTypeWithPriceDto) {
     const data = await this.adminService.createFuelTypeWithPrice(dto);
     return {
@@ -273,6 +286,7 @@ export class AdminController {
   @Patch('fuel-types/:id')
   @ApiOperation({ summary: 'Update a fuel type' })
   @ApiOkResponse({ description: 'Fuel type updated' })
+  @AuditAction('UPDATE_FUEL_TYPE', 'fuel_types')
   async updateFuelType(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateFuelTypeDto,
@@ -289,6 +303,7 @@ export class AdminController {
   @Delete('fuel-types/:id')
   @ApiOperation({ summary: 'Delete a fuel type' })
   @ApiOkResponse({ description: 'Fuel type deleted' })
+  @AuditAction('DELETE_FUEL_TYPE', 'fuel_types')
   async deleteFuelType(@Param('id', ParseIntPipe) id: number) {
     const data = await this.adminService.deleteFuelType(id);
     return {
@@ -303,6 +318,7 @@ export class AdminController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create or update a fuel price by fuel type' })
   @ApiCreatedResponse({ description: 'Fuel price upserted' })
+  @AuditAction('UPSERT_FUEL_PRICE', 'fuel_prices')
   async upsertFuelPrice(@Body() dto: UpsertFuelPriceDto) {
     const data = await this.adminService.upsertFuelPrice(dto);
     return {
@@ -330,6 +346,7 @@ export class AdminController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a vehicle category' })
   @ApiCreatedResponse({ description: 'Vehicle category created' })
+  @AuditAction('CREATE_VEHICLE_CATEGORY', 'vehicle_categories')
   async createVehicleCategory(@Body() dto: CreateVehicleCategoryDto) {
     const data = await this.adminService.createVehicleCategory(dto);
     return {
@@ -369,6 +386,7 @@ export class AdminController {
   @Patch('vehicle-categories/:id')
   @ApiOperation({ summary: 'Update a vehicle category' })
   @ApiOkResponse({ description: 'Vehicle category updated' })
+  @AuditAction('UPDATE_VEHICLE_CATEGORY', 'vehicle_categories')
   async updateVehicleCategory(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateVehicleCategoryDto,
@@ -385,6 +403,7 @@ export class AdminController {
   @Delete('vehicle-categories/:id')
   @ApiOperation({ summary: 'Delete a vehicle category' })
   @ApiOkResponse({ description: 'Vehicle category deleted' })
+  @AuditAction('DELETE_VEHICLE_CATEGORY', 'vehicle_categories')
   async deleteVehicleCategory(@Param('id', ParseIntPipe) id: number) {
     const data = await this.adminService.deleteVehicleCategory(id);
     return {
@@ -438,4 +457,23 @@ export class AdminController {
       timestamp: new Date().toISOString(),
     };
   }
+
+  @Get('audit-logs')
+  @ApiOperation({ summary: 'View system audit logs' })
+  @ApiOkResponse({ description: 'Audit logs retrieved' })
+  async getAuditLogs(
+    @Query('limit') limitRaw?: string,
+    @Query('offset') offsetRaw?: string,
+  ) {
+    const limit = limitRaw ? parseInt(limitRaw, 10) : 50;
+    const offset = offsetRaw ? parseInt(offsetRaw, 10) : 0;
+    const data = await this.auditService.getAuditLogs(limit, offset);
+    return {
+      success: true,
+      message: 'Audit logs retrieved',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
 }
+
