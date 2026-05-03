@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -27,6 +28,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
 import { AdminService } from './admin.service';
+import { FuelInventoryService } from '../fuel-inventory/fuel-inventory.service';
 import { AuditService } from '../audit/audit.service';
 import { AuditAction } from '../audit/audit-action.decorator';
 import { CreateStationDto } from './dto/create-station.dto';
@@ -47,6 +49,8 @@ import { AdminDailyTotalsQueryDto } from './dto/admin-daily-totals-query.dto';
 import { AdminServiceActivityQueryDto } from './dto/admin-service-activity-query.dto';
 import { AdminDistributionQueryDto } from './dto/admin-distribution-query.dto';
 import { UpdateVehicleQuotaRulesDto } from './dto/update-vehicle-quota-rules.dto';
+import { AdjustStationFuelInventoryDto } from './dto/adjust-station-fuel-inventory.dto';
+import { ListFuelInventoryAdjustmentsQueryDto } from './dto/list-fuel-inventory-adjustments-query.dto';
 
 @ApiTags('Admin')
 @ApiBearerAuth('JWT-auth')
@@ -59,6 +63,7 @@ export class AdminController {
   constructor(
     private readonly adminService: AdminService,
     private readonly auditService: AuditService,
+    private readonly fuelInventoryService: FuelInventoryService,
   ) {}
 
   @Get('health')
@@ -126,6 +131,80 @@ export class AdminController {
     return {
       success: true,
       message: 'Station retrieved',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Get('stations/:id/fuel-inventory')
+  @ApiOperation({ summary: 'List per-fuel-type remaining inventory for a station' })
+  @ApiOkResponse({ description: 'Fuel inventory retrieved' })
+  async getStationFuelInventory(@Param('id', ParseIntPipe) id: number) {
+    const data = await this.fuelInventoryService.getInventoryForStation(id);
+    return {
+      success: true,
+      message: 'Fuel inventory retrieved',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Patch('stations/:id/fuel-inventory/adjust')
+  @ApiOperation({
+    summary: 'Set remaining fuel liters for one fuel type (append-only adjustment history)',
+  })
+  @ApiOkResponse({ description: 'Fuel inventory adjusted' })
+  @AuditAction('ADJUST_STATION_FUEL_INVENTORY', 'station_fuel_inventory')
+  async adjustStationFuelInventory(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: AdjustStationFuelInventoryDto,
+    @CurrentUser() actor: CurrentUserPayload,
+  ) {
+    const data = await this.fuelInventoryService.adjustInventory({
+      stationId: id,
+      fuelTypeId: dto.fuelTypeId,
+      remainingLiters: dto.remainingLiters,
+      reason: dto.reason,
+      note: dto.note,
+      changedByUserId: actor.id,
+    });
+    return {
+      success: true,
+      message: 'Fuel inventory adjusted',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Get('fuel-inventory-adjustments')
+  @ApiOperation({ summary: 'List fuel inventory adjustments (audit history)' })
+  @ApiOkResponse({ description: 'Adjustments retrieved' })
+  async listFuelInventoryAdjustments(@Query() query: ListFuelInventoryAdjustmentsQueryDto) {
+    const limit = query.limit ?? 50;
+    const offset = query.offset ?? 0;
+    const fromDate = query.from ? new Date(query.from) : undefined;
+    const toDate = query.to ? new Date(query.to) : undefined;
+    if (
+      fromDate &&
+      toDate &&
+      Number.isFinite(fromDate.getTime()) &&
+      Number.isFinite(toDate.getTime()) &&
+      fromDate > toDate
+    ) {
+      throw new BadRequestException('from must be earlier than or equal to to');
+    }
+    const data = await this.fuelInventoryService.listAdjustments({
+      stationId: query.stationId,
+      fuelTypeId: query.fuelTypeId,
+      from:
+        fromDate && Number.isFinite(fromDate.getTime()) ? fromDate : undefined,
+      to: toDate && Number.isFinite(toDate.getTime()) ? toDate : undefined,
+      limit,
+      offset,
+    });
+    return {
+      success: true,
+      message: 'Fuel inventory adjustments retrieved',
       data,
       timestamp: new Date().toISOString(),
     };
