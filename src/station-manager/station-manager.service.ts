@@ -60,7 +60,6 @@ export class StationManagerService {
       phone: row.phone,
       isActive: row.isActive,
       queueIntakePaused: row.queueIntakePaused,
-      remainingFuel: row.remainingFuel ? parseFloat(row.remainingFuel.toString()) : null,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };

@@ -18,7 +18,6 @@ export const stations = pgTable('stations', {
   phone: text('phone'),
   isActive: boolean('is_active').notNull().default(true),
   queueIntakePaused: boolean('queue_intake_paused').notNull().default(false),
-  remainingFuel: numeric('remaining_fuel', { precision: 10, scale: 2 }),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });

@@ -58,7 +58,6 @@ export class QueueService {
       phone: s.phone,
       isActive: s.isActive,
       queueIntakePaused: s.queueIntakePaused,
-      remainingFuel: s.remainingFuel,
       activeQueueLength: countMap.get(s.id) ?? 0,
     }));
   }

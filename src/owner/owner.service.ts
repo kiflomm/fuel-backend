@@ -206,7 +206,6 @@ export class OwnerService {
         phone: string | null;
         isActive: boolean;
         queueIntakePaused: boolean;
-        remainingFuel: string | null;
       } | null;
       vehicle: {
         id: number;
@@ -260,7 +259,6 @@ export class OwnerService {
               phone: station.phone,
               isActive: station.isActive,
               queueIntakePaused: station.queueIntakePaused,
-              remainingFuel: station.remainingFuel,
             }
           : null,
         vehicle: vehicle
