@@ -50,6 +50,8 @@ export interface AdjustFuelInventoryResult {
 
 @Injectable()
 export class FuelInventoryService {
+  private static readonly MAX_STATION_INVENTORY_LITERS = 100_000_000;
+
   constructor(
     @Inject(DrizzleAsyncProvider)
     private readonly db: NodePgDatabase<typeof schema>,
@@ -201,13 +203,13 @@ export class FuelInventoryService {
   async adjustInventory(params: {
     stationId: number;
     fuelTypeId: number;
-    remainingLiters: number;
+    deltaLiters: number;
     reason?: string | null;
     note?: string | null;
     changedByUserId: number;
   }): Promise<AdjustFuelInventoryResult> {
-    if (params.remainingLiters < 0) {
-      throw new BadRequestException('remainingLiters must be greater than or equal to 0');
+    if (!Number.isFinite(params.deltaLiters) || params.deltaLiters <= 0) {
+      throw new BadRequestException('deltaLiters must be a positive number');
     }
 
     const result = await this.db.transaction(async (tx) => {
@@ -245,8 +247,14 @@ export class FuelInventoryService {
       const previousLitersNum = existingInv
         ? parseFloat(existingInv.remainingLiters.toString())
         : 0;
-      const updatedLitersNum = params.remainingLiters;
-      const deltaLitersNum = updatedLitersNum - previousLitersNum;
+      const deltaLitersNum = params.deltaLiters;
+      const updatedLitersNum = previousLitersNum + deltaLitersNum;
+
+      if (updatedLitersNum > FuelInventoryService.MAX_STATION_INVENTORY_LITERS) {
+        throw new BadRequestException(
+          `Resulting inventory cannot exceed ${FuelInventoryService.MAX_STATION_INVENTORY_LITERS} liters`,
+        );
+      }
 
       const prevStr = this.litersToFixed2(previousLitersNum);
       const updStr = this.litersToFixed2(updatedLitersNum);
@@ -323,6 +331,7 @@ export class FuelInventoryService {
         reason: result.reason,
         note: result.note,
         adjustmentId: result.adjustmentId,
+        mode: 'add',
       },
     );
 
