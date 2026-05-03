@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 
 import type { Response } from 'express';
+import type { CookieOptions } from 'express';
 import { AuthService } from './auth.service';
 import {
   LoginDto,
@@ -41,6 +42,23 @@ import {
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  private getRefreshCookieOptions(): CookieOptions {
+    const appUrl = process.env.APP_URL;
+    const serverUrl = process.env.SERVER_URL;
+    const isProduction = process.env.NODE_ENV === 'production';
+    const isSecureContext =
+      isProduction || appUrl?.startsWith('https://') || serverUrl?.startsWith('https://');
+    const isCrossOrigin = Boolean(appUrl && serverUrl && appUrl !== serverUrl);
+    const shouldUseCrossSiteCookie = Boolean(isCrossOrigin && isSecureContext);
+
+    return {
+      httpOnly: true,
+      secure: Boolean(isSecureContext),
+      sameSite: shouldUseCrossSiteCookie ? 'none' : 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    };
+  }
+
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Register a new user account' })
@@ -51,12 +69,7 @@ export class AuthController {
 
     // Set refresh token in httpOnly cookie
     if (result.refreshToken) {
-      res.cookie('refreshToken', result.refreshToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      });
+      res.cookie('refreshToken', result.refreshToken, this.getRefreshCookieOptions());
     }
 
     return {
@@ -80,12 +93,7 @@ export class AuthController {
 
     // Set refresh token in httpOnly cookie
     if (result.refreshToken) {
-      res.cookie('refreshToken', result.refreshToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      });
+      res.cookie('refreshToken', result.refreshToken, this.getRefreshCookieOptions());
     }
 
     return {
@@ -114,12 +122,7 @@ export class AuthController {
 
     // Set new refresh token in httpOnly cookie
     if (result.refreshToken) {
-      res.cookie('refreshToken', result.refreshToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      });
+      res.cookie('refreshToken', result.refreshToken, this.getRefreshCookieOptions());
     }
 
     return {
@@ -147,7 +150,7 @@ export class AuthController {
     await this.authService.logout(user.tokenId);
 
     // Clear refresh token cookie
-    res.clearCookie('refreshToken');
+    res.clearCookie('refreshToken', this.getRefreshCookieOptions());
 
     return {
       success: true,
