@@ -64,6 +64,13 @@
       "when": 1777841286546,
       "tag": "0008_grey_bishop",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1777842345768,
+      "tag": "0009_fast_selene",
+      "breakpoints": true
     }
   ]
 }

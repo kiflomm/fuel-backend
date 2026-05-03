@@ -73,7 +73,6 @@ export class AdminService {
       phone: row.phone,
       isActive: row.isActive,
       queueIntakePaused: row.queueIntakePaused,
-      remainingFuel: row.remainingFuel ? parseFloat(row.remainingFuel.toString()) : null,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };
@@ -223,7 +222,6 @@ export class AdminService {
     if (dto.latitude !== undefined) patch.latitude = dto.latitude.toString();
     if (dto.longitude !== undefined) patch.longitude = dto.longitude.toString();
     if (dto.phone !== undefined) patch.phone = dto.phone;
-    if (dto.remainingFuel !== undefined) patch.remainingFuel = dto.remainingFuel.toString();
     if (dto.isActive !== undefined) patch.isActive = dto.isActive;
     if (dto.queueIntakePaused !== undefined)
       patch.queueIntakePaused = dto.queueIntakePaused;

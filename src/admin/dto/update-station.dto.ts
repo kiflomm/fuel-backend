@@ -27,13 +27,6 @@ export class UpdateStationDto {
   @IsString()
   phone?: string;
 
-  @ApiPropertyOptional({
-    description: 'Remaining fuel in liters',
-  })
-  @IsOptional()
-  @IsNumber()
-  remainingFuel?: number;
-
   @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()
