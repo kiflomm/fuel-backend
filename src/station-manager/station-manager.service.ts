@@ -13,7 +13,6 @@ import { DrizzleAsyncProvider } from '../database/drizzle.provider';
 import { CreateStationWorkerDto } from './dto/create-station-worker.dto';
 import { UpdateStationWorkerDto } from './dto/update-station-worker.dto';
 import { UpdateStationWorkerStatusDto } from './dto/update-station-worker-status.dto';
-import { UpdateStationFuelStatusDto } from './dto/update-station-fuel-status.dto';
 import { ListStationTransactionsQueryDto } from './dto/list-station-transactions-query.dto';
 import { DailyTotalsQueryDto } from './dto/daily-totals-query.dto';
 import { ServiceActivityQueryDto } from './dto/service-activity-query.dto';
@@ -279,15 +278,6 @@ export class StationManagerService {
       : [];
     const vehicleMap = new Map(vehicles.map((row) => [row.id, row]));
 
-    const ownerIds = [...new Set(vehicles.map((row) => row.ownerUserId))];
-    const owners = ownerIds.length
-      ? await this.db
-          .select()
-          .from(schema.users)
-          .where(inArray(schema.users.id, ownerIds))
-      : [];
-    const ownerMap = new Map(owners.map((row) => [row.id, row]));
-
     const payments = paymentIds.length
       ? await this.db
           .select()
@@ -296,48 +286,26 @@ export class StationManagerService {
       : [];
     const paymentMap = new Map(payments.map((row) => [row.id, row]));
 
-    return bookings.map((booking, index) => {
+    const items = bookings.map((booking) => {
       const vehicle = vehicleMap.get(booking.vehicleId) ?? null;
-      const owner = vehicle ? ownerMap.get(vehicle.ownerUserId) ?? null : null;
       const payment = paymentMap.get(booking.paymentId) ?? null;
 
       return {
-        bookingId: booking.id,
-        stationId: booking.stationId,
-        status: booking.status,
-        stationSequence: booking.stationSequence,
-        queuePosition: index + 1,
-        bookedAt: booking.bookedAt.toISOString(),
-        vehicle: vehicle
-          ? {
-              id: vehicle.id,
-              plateNumber: vehicle.plateNumber,
-              categoryId: vehicle.categoryId,
-              label: vehicle.label,
-            }
-          : null,
-        owner: owner
-          ? {
-              id: owner.id,
-              firstName: owner.firstName,
-              lastName: owner.lastName,
-              email: owner.email,
-            }
-          : null,
-        payment: payment
-          ? {
-              id: payment.id,
-              fuelType: payment.fuelTypeCode,
-              litersRequested: payment.litersRequested,
-              pricePerLiter: payment.pricePerLiter,
-              amount: payment.amount,
-              currency: payment.currency,
-              status: payment.status,
-              paidAt: payment.paidAt ? payment.paidAt.toISOString() : null,
-            }
-          : null,
+        id: booking.id,
+        plateNumber: vehicle?.plateNumber ?? 'Unknown',
+        vehicleCategory: vehicle?.label ?? vehicle?.categoryId?.toString() ?? 'Unknown',
+        status: payment?.status ?? booking.status,
+        joinedAt: booking.bookedAt.toISOString(),
       };
     });
+
+    return {
+      stationId: station.id,
+      stationName: station.name,
+      isIntakePaused: station.queueIntakePaused,
+      queueLength: items.length,
+      items,
+    };
   }
 
   async setQueueIntakePaused(managerUserId: number, paused: boolean) {
@@ -347,24 +315,6 @@ export class StationManagerService {
       .update(schema.stations)
       .set({
         queueIntakePaused: paused,
-        updatedAt: new Date(),
-      })
-      .where(eq(schema.stations.id, station.id))
-      .returning();
-
-    return this.mapStation(updated);
-  }
-
-  async updateFuelStatus(
-    managerUserId: number,
-    dto: UpdateStationFuelStatusDto,
-  ) {
-    const { station } = await this.getManagerContext(managerUserId);
-
-    const [updated] = await this.db
-      .update(schema.stations)
-      .set({
-        remainingFuel: dto.remainingFuel.toString(),
         updatedAt: new Date(),
       })
       .where(eq(schema.stations.id, station.id))

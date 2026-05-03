@@ -81,15 +81,25 @@ class MockStationManagerService {
   }
 
   async getLiveQueue() {
-    return [{ bookingId: 1, queuePosition: 1, status: 'ACTIVE' }];
+    return {
+      stationId: 1,
+      stationName: 'Station 1',
+      isIntakePaused: false,
+      queueLength: 1,
+      items: [
+        {
+          id: 1,
+          plateNumber: 'ABC-123',
+          vehicleCategory: '1',
+          status: 'ACTIVE',
+          joinedAt: new Date().toISOString(),
+        },
+      ],
+    };
   }
 
   async setQueueIntakePaused(_managerId: number, paused: boolean) {
     return { id: 1, queueIntakePaused: paused };
-  }
-
-  async updateFuelStatus(_managerId: number, dto: { fuelStatus: string }) {
-    return { id: 1, fuelStatus: dto.fuelStatus };
   }
 
   async listTransactions() {
@@ -302,16 +312,6 @@ describe('StationManagerController (e2e)', () => {
       return request(app.getHttpServer())
         .patch('/station-manager/queue/intake/resume')
         .set('Authorization', 'Bearer fake-token')
-        .expect(200);
-    });
-
-    it('PATCH /station-manager/station/fuel-status returns 200', () => {
-      return request(app.getHttpServer())
-        .patch('/station-manager/station/fuel-status')
-        .set('Authorization', 'Bearer fake-token')
-        .send({
-          fuelStatus: 'LIMITED',
-        })
         .expect(200);
     });
 

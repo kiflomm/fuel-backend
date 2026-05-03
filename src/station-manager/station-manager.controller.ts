@@ -30,7 +30,6 @@ import { AuditAction } from '../audit/audit-action.decorator';
 import { CreateStationWorkerDto } from './dto/create-station-worker.dto';
 import { UpdateStationWorkerDto } from './dto/update-station-worker.dto';
 import { UpdateStationWorkerStatusDto } from './dto/update-station-worker-status.dto';
-import { UpdateStationFuelStatusDto } from './dto/update-station-fuel-status.dto';
 import { ListStationTransactionsQueryDto } from './dto/list-station-transactions-query.dto';
 import { DailyTotalsQueryDto } from './dto/daily-totals-query.dto';
 import { ServiceActivityQueryDto } from './dto/service-activity-query.dto';
@@ -190,23 +189,6 @@ export class StationManagerController {
     return {
       success: true,
       message: 'Queue intake resumed',
-      data,
-      timestamp: new Date().toISOString(),
-    };
-  }
-
-  @Patch('station/fuel-status')
-  @ApiOperation({ summary: 'Update fuel availability status for your station' })
-  @ApiOkResponse({ description: 'Station fuel status updated' })
-  @AuditAction('UPDATE_STATION_FUEL_STATUS', 'stations')
-  async updateFuelStatus(
-    @CurrentUser() user: CurrentUserPayload,
-    @Body() dto: UpdateStationFuelStatusDto,
-  ) {
-    const data = await this.stationManagerService.updateFuelStatus(user.id, dto);
-    return {
-      success: true,
-      message: 'Station fuel status updated',
       data,
       timestamp: new Date().toISOString(),
     };
