@@ -151,7 +151,8 @@ export class AdminController {
 
   @Patch('stations/:id/fuel-inventory/adjust')
   @ApiOperation({
-    summary: 'Set remaining fuel liters for one fuel type (append-only adjustment history)',
+    summary:
+      'Add liters to current stock for one fuel type (append-only adjustment history)',
   })
   @ApiOkResponse({ description: 'Fuel inventory adjusted' })
   @AuditAction('ADJUST_STATION_FUEL_INVENTORY', 'station_fuel_inventory')
@@ -163,7 +164,7 @@ export class AdminController {
     const data = await this.fuelInventoryService.adjustInventory({
       stationId: id,
       fuelTypeId: dto.fuelTypeId,
-      remainingLiters: dto.remainingLiters,
+      deltaLiters: dto.deltaLiters,
       reason: dto.reason,
       note: dto.note,
       changedByUserId: actor.id,
