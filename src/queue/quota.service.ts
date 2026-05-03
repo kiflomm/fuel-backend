@@ -82,6 +82,19 @@ export class QuotaService {
     return vehicle;
   }
 
+  /** Vehicle row by id only (no active check). Used for read-only quota snapshots. */
+  private async getVehicleRowOrThrow(vehicleId: number) {
+    const [vehicle] = await this.db
+      .select()
+      .from(schema.vehicles)
+      .where(eq(schema.vehicles.id, vehicleId))
+      .limit(1);
+    if (!vehicle) {
+      throw new NotFoundException('Vehicle not found');
+    }
+    return vehicle;
+  }
+
   private async getActiveRules(vehicleId: number) {
     const rules = await this.db
       .select()
@@ -199,6 +212,36 @@ export class QuotaService {
 
     if (!hasRemaining) {
       throw new BadRequestException('No fuel quota remaining for this vehicle');
+    }
+
+    return this.summarizeBalances(balances);
+  }
+
+  /**
+   * Current quota balances for display (owner app). Does not throw when remaining is zero.
+   * Inactive vehicles return empty periods; missing quota rules still throw (same as assert path).
+   */
+  async getVehicleQuotaSnapshot(vehicleId: number): Promise<{
+    remainingLiters: string;
+    litersLimit: string;
+    periods: ActiveBalance[];
+  }> {
+    const vehicle = await this.getVehicleRowOrThrow(vehicleId);
+    if (!vehicle.isActive) {
+      return {
+        remainingLiters: '0.00',
+        litersLimit: '0.00',
+        periods: [],
+      };
+    }
+
+    const rules = await this.getActiveRules(vehicle.id);
+    const now = new Date();
+    const balances: ActiveBalance[] = [];
+
+    for (const rule of rules) {
+      const balance = await this.ensureBalanceForRule(this.db, vehicleId, rule, now);
+      balances.push(balance);
     }
 
     return this.summarizeBalances(balances);
