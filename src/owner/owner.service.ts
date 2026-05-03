@@ -135,7 +135,7 @@ export class OwnerService {
 
   async getVehicleQuota(ownerUserId: number, vehicleId: number) {
     await this.getVehicle(ownerUserId, vehicleId);
-    const quota = await this.quotaService.assertVehicleHasQuotaRemaining(vehicleId);
+    const quota = await this.quotaService.getVehicleQuotaSnapshot(vehicleId);
     return {
       vehicleId,
       ...quota,
