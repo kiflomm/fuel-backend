@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -26,6 +27,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
 import { StationManagerService } from './station-manager.service';
+import { FuelInventoryService } from '../fuel-inventory/fuel-inventory.service';
 import { AuditAction } from '../audit/audit-action.decorator';
 import { CreateStationWorkerDto } from './dto/create-station-worker.dto';
 import { UpdateStationWorkerDto } from './dto/update-station-worker.dto';
@@ -42,7 +44,10 @@ import { ServiceActivityQueryDto } from './dto/service-activity-query.dto';
 @Roles('STATION_MANAGER')
 @Controller('station-manager')
 export class StationManagerController {
-  constructor(private readonly stationManagerService: StationManagerService) {}
+  constructor(
+    private readonly stationManagerService: StationManagerService,
+    private readonly fuelInventoryService: FuelInventoryService,
+  ) {}
 
   @Get('health')
   @ApiOperation({ summary: 'Verify station manager authentication' })
@@ -142,6 +147,22 @@ export class StationManagerController {
     return {
       success: true,
       message: 'Station worker status updated',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Get('fuel-inventory')
+  @ApiOperation({ summary: 'View per-fuel-type remaining inventory for your station (refresh manually)' })
+  @ApiOkResponse({ description: 'Fuel inventory retrieved' })
+  async getFuelInventory(@CurrentUser() user: CurrentUserPayload) {
+    if (user.stationId == null) {
+      throw new BadRequestException('Station manager has no assigned station');
+    }
+    const data = await this.fuelInventoryService.getInventoryForStation(user.stationId);
+    return {
+      success: true,
+      message: 'Fuel inventory retrieved',
       data,
       timestamp: new Date().toISOString(),
     };

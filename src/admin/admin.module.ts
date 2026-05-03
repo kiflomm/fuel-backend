@@ -5,9 +5,10 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
 import { AuditModule } from '../audit/audit.module';
+import { FuelInventoryModule } from '../fuel-inventory/fuel-inventory.module';
 
 @Module({
-  imports: [DrizzleModule, AuthModule, AuditModule],
+  imports: [DrizzleModule, AuthModule, AuditModule, FuelInventoryModule],
   controllers: [AdminController],
   providers: [AdminService, RolesGuard],
 })

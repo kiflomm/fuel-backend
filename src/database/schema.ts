@@ -12,6 +12,8 @@ export * from './schema/vehicles';
 export * from './schema/vehicle-quota-rules';
 export * from './schema/vehicle-quota-balances';
 export * from './schema/fuel-types';
+export * from './schema/station-fuel-inventory';
+export * from './schema/fuel-inventory-adjustments';
 export * from './schema/fuel-prices';
 export * from './schema/payments';
 export * from './schema/queue-bookings';
