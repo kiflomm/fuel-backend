@@ -3,6 +3,7 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -23,6 +24,8 @@ import {
 
 @Injectable()
 export class QueueService {
+  private readonly logger = new Logger(QueueService.name);
+
   constructor(
     @Inject(DrizzleAsyncProvider)
     private readonly db: NodePgDatabase<typeof schema>,
@@ -63,33 +66,40 @@ export class QueueService {
   }
 
   async listFuelPrices() {
-    const rows = await this.db
-      .select({
-        id: schema.fuelPrices.id,
-        pricePerLiter: schema.fuelPrices.pricePerLiter,
-        isActive: schema.fuelPrices.isActive,
-        createdAt: schema.fuelPrices.createdAt,
-        updatedAt: schema.fuelPrices.updatedAt,
-        fuelTypeCode: schema.fuelTypes.code,
-        fuelTypeName: schema.fuelTypes.name,
-      })
-      .from(schema.fuelPrices)
-      .innerJoin(
-        schema.fuelTypes,
-        eq(schema.fuelPrices.fuelTypeId, schema.fuelTypes.id),
-      )
-      .where(
-        and(eq(schema.fuelPrices.isActive, true), eq(schema.fuelTypes.isActive, true)),
-      );
+    try {
+      const rows = await this.db
+        .select({
+          id: schema.fuelPrices.id,
+          pricePerLiter: schema.fuelPrices.pricePerLiter,
+          isActive: schema.fuelPrices.isActive,
+          createdAt: schema.fuelPrices.createdAt,
+          updatedAt: schema.fuelPrices.updatedAt,
+          fuelTypeCode: schema.fuelTypes.code,
+          fuelTypeName: schema.fuelTypes.name,
+        })
+        .from(schema.fuelPrices)
+        .innerJoin(
+          schema.fuelTypes,
+          eq(schema.fuelPrices.fuelTypeId, schema.fuelTypes.id),
+        )
+        .where(
+          and(eq(schema.fuelPrices.isActive, true), eq(schema.fuelTypes.isActive, true)),
+        );
 
-    return rows.map((row) => ({
-      id: row.id,
-      fuelType: row.fuelTypeCode,
-      pricePerLiter: row.pricePerLiter,
-      isActive: row.isActive,
-      createdAt: row.createdAt.toISOString(),
-      updatedAt: row.updatedAt.toISOString(),
-    }));
+      return rows.map((row) => ({
+        id: row.id,
+        fuelType: row.fuelTypeCode,
+        pricePerLiter: row.pricePerLiter,
+        isActive: row.isActive,
+        createdAt: row.createdAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
+      }));
+    } catch (error) {
+      this.logger.error(
+        `Failed listing active fuel prices at ${new Date().toISOString()}: ${this.extractErrorMessage(error)}`,
+      );
+      throw error;
+    }
   }
 
   async initiatePayment(ownerUserId: number, dto: InitiatePaymentDto) {
@@ -239,6 +249,9 @@ export class QueueService {
         String(chapa.status ?? '').toLowerCase() !== 'success' ||
         !checkoutUrl
       ) {
+        this.logger.error(
+          `Chapa initialize returned non-success for paymentId=${payment.id} txRef=${payment.txRef}: status=${String(chapa.status ?? 'unknown')}`,
+        );
         await this.db
           .update(schema.payments)
           .set({
@@ -267,6 +280,9 @@ export class QueueService {
         checkoutUrl,
       };
     } catch (e) {
+      this.logger.error(
+        `Payment initiation failed for ownerUserId=${ownerUserId} vehicleId=${dto.vehicleId} stationId=${dto.stationId}: ${this.extractErrorMessage(e)}`,
+      );
       await this.db
         .update(schema.payments)
         .set({ status: 'FAILED', updatedAt: new Date() })
@@ -327,6 +343,9 @@ export class QueueService {
     if (expectedCurrency && gotCurrency && expectedCurrency !== gotCurrency) mismatches.push('currency');
 
     if (!ok || mismatches.length > 0) {
+      this.logger.error(
+        `Payment verify failed txRef=${payment.txRef} paymentId=${payment.id} mismatches=${mismatches.join(',') || 'none'} providerStatus=${String((raw as Record<string, unknown>)?.['status'] ?? 'unknown')}`,
+      );
       await this.db
         .update(schema.payments)
         .set({
@@ -486,6 +505,11 @@ export class QueueService {
       verifyToken: booking.verifyToken,
       bookedAt: booking.bookedAt.toISOString(),
     };
+  }
+
+  private extractErrorMessage(error: unknown): string {
+    if (error instanceof Error) return error.message;
+    return String(error);
   }
 
   async workerVerifyBooking(
