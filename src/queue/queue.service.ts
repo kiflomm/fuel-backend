@@ -65,6 +65,28 @@ export class QueueService {
     }));
   }
 
+  async getStationById(stationId: number) {
+    const [station] = await this.db
+      .select({
+        id: schema.stations.id,
+        name: schema.stations.name,
+        latitude: schema.stations.latitude,
+        longitude: schema.stations.longitude,
+        phone: schema.stations.phone,
+        isActive: schema.stations.isActive,
+        queueIntakePaused: schema.stations.queueIntakePaused,
+      })
+      .from(schema.stations)
+      .where(eq(schema.stations.id, stationId))
+      .limit(1);
+
+    if (!station) {
+      throw new NotFoundException('Station not found');
+    }
+
+    return station;
+  }
+
   async listFuelPrices() {
     try {
       const rows = await this.db

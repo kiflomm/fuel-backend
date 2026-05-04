@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
   Post,
@@ -33,6 +34,24 @@ import { WorkerCompleteDto } from './dto/worker-complete.dto';
 @Controller('queue/worker')
 export class QueueWorkerController {
   constructor(private readonly queueService: QueueService) {}
+
+  @Get('station')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get the assigned station info for the current worker' })
+  @ApiOkResponse({ description: 'Station retrieved' })
+  async getAssignedStation(@CurrentUser() user: CurrentUserPayload) {
+    if (!user.stationId) {
+      throw new BadRequestException('Station worker is not assigned to a station');
+    }
+
+    const data = await this.queueService.getStationById(user.stationId);
+    return {
+      success: true,
+      message: 'Station retrieved',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
 
   @Post('verify')
   @HttpCode(HttpStatus.OK)
