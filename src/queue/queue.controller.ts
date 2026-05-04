@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Logger,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -35,6 +36,8 @@ import { JoinQueueDto } from './dto/join-queue.dto';
 @Roles('VEHICLE_OWNER')
 @Controller('queue')
 export class QueueController {
+  private readonly logger = new Logger(QueueController.name);
+
   constructor(private readonly queueService: QueueService) {}
 
   @Get('stations')
@@ -58,13 +61,20 @@ export class QueueController {
   })
   @ApiOkResponse({ description: 'Fuel prices retrieved' })
   async listFuelPrices() {
-    const data = await this.queueService.listFuelPrices();
-    return {
-      success: true,
-      message: 'Fuel prices retrieved',
-      data,
-      timestamp: new Date().toISOString(),
-    };
+    try {
+      const data = await this.queueService.listFuelPrices();
+      return {
+        success: true,
+        message: 'Fuel prices retrieved',
+        data,
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      this.logger.error(
+        `queue.fuel-prices failed at ${new Date().toISOString()} - ${this.extractErrorMessage(error)}`,
+      );
+      throw error;
+    }
   }
 
   @Post('payments/initiate')
@@ -76,13 +86,20 @@ export class QueueController {
     @CurrentUser() user: CurrentUserPayload,
     @Body() dto: InitiatePaymentDto,
   ) {
-    const data = await this.queueService.initiatePayment(user.id, dto);
-    return {
-      success: true,
-      message: 'Payment initiated',
-      data,
-      timestamp: new Date().toISOString(),
-    };
+    try {
+      const data = await this.queueService.initiatePayment(user.id, dto);
+      return {
+        success: true,
+        message: 'Payment initiated',
+        data,
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      this.logger.error(
+        `queue.payments.initiate failed userId=${user.id} at ${new Date().toISOString()} - ${this.extractErrorMessage(error)}`,
+      );
+      throw error;
+    }
   }
 
   @Post('payments/verify')
@@ -96,13 +113,20 @@ export class QueueController {
     @CurrentUser() user: CurrentUserPayload,
     @Body() dto: VerifyPaymentDto,
   ) {
-    const data = await this.queueService.verifyPayment(user.id, dto.txRef);
-    return {
-      success: true,
-      message: 'Payment verified',
-      data,
-      timestamp: new Date().toISOString(),
-    };
+    try {
+      const data = await this.queueService.verifyPayment(user.id, dto.txRef);
+      return {
+        success: true,
+        message: 'Payment verified',
+        data,
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      this.logger.error(
+        `queue.payments.verify failed userId=${user.id} txRef=${dto.txRef} at ${new Date().toISOString()} - ${this.extractErrorMessage(error)}`,
+      );
+      throw error;
+    }
   }
 
   @Post('join')
@@ -116,12 +140,24 @@ export class QueueController {
     @CurrentUser() user: CurrentUserPayload,
     @Body() dto: JoinQueueDto,
   ) {
-    const data = await this.queueService.joinQueue(user.id, dto.paymentId);
-    return {
-      success: true,
-      message: 'Joined queue',
-      data,
-      timestamp: new Date().toISOString(),
-    };
+    try {
+      const data = await this.queueService.joinQueue(user.id, dto.paymentId);
+      return {
+        success: true,
+        message: 'Joined queue',
+        data,
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      this.logger.error(
+        `queue.join failed userId=${user.id} paymentId=${dto.paymentId} at ${new Date().toISOString()} - ${this.extractErrorMessage(error)}`,
+      );
+      throw error;
+    }
+  }
+
+  private extractErrorMessage(error: unknown): string {
+    if (error instanceof Error) return error.message;
+    return String(error);
   }
 }
