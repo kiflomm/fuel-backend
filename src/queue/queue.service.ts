@@ -11,7 +11,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DrizzleAsyncProvider } from '../database/drizzle.provider';
 import { Inject } from '@nestjs/common';
 import * as schema from '../database/schema';
-import { and, count, eq, lt, max, sql } from 'drizzle-orm';
+import { and, count, desc, eq, gte, inArray, lt, lte, max, sql } from 'drizzle-orm';
 import { randomBytes } from 'crypto';
 import { ChapaService } from '../payment/chapa.service';
 import { QuotaService } from './quota.service';
@@ -534,6 +534,23 @@ export class QueueService {
     return String(error);
   }
 
+  private normalizeDateRange(from?: string, to?: string) {
+    const fromDate = from ? new Date(from) : undefined;
+    const toDate = to ? new Date(to) : undefined;
+
+    if (fromDate && Number.isNaN(fromDate.getTime())) {
+      throw new BadRequestException('Invalid from date');
+    }
+    if (toDate && Number.isNaN(toDate.getTime())) {
+      throw new BadRequestException('Invalid to date');
+    }
+    if (fromDate && toDate && fromDate > toDate) {
+      throw new BadRequestException('from must be earlier than or equal to to');
+    }
+
+    return { fromDate, toDate };
+  }
+
   async workerVerifyBooking(
     stationWorkerUserId: number,
     stationId: number,
@@ -719,6 +736,143 @@ export class QueueService {
       litersDispensed: result.txn.litersDispensed,
       receiptRef: result.txn.receiptRef ?? null,
       servedAt: result.txn.servedAt.toISOString(),
+    };
+  }
+
+  async listWorkerTransactions(stationId: number, query: { from?: string; to?: string }) {
+    const { fromDate, toDate } = this.normalizeDateRange(query.from, query.to);
+
+    const conditions = [eq(schema.transactions.stationId, stationId)];
+    if (fromDate) conditions.push(gte(schema.transactions.servedAt, fromDate));
+    if (toDate) conditions.push(lte(schema.transactions.servedAt, toDate));
+
+    const rows = await this.db
+      .select()
+      .from(schema.transactions)
+      .where(and(...conditions))
+      .orderBy(desc(schema.transactions.servedAt));
+
+    const paymentIds = [...new Set(rows.map((r) => r.paymentId))];
+    const txVehicleIds = [...new Set(rows.map((r) => r.vehicleId))];
+
+    const payments = paymentIds.length
+      ? await this.db
+          .select()
+          .from(schema.payments)
+          .where(inArray(schema.payments.id, paymentIds))
+      : [];
+    const paymentMap = new Map(payments.map((p) => [p.id, p]));
+
+    const vehiclesFull = txVehicleIds.length
+      ? await this.db
+          .select()
+          .from(schema.vehicles)
+          .where(inArray(schema.vehicles.id, txVehicleIds))
+      : [];
+    const vehicleMap = new Map(vehiclesFull.map((v) => [v.id, v]));
+
+    return rows.map((row) => {
+      const payment = paymentMap.get(row.paymentId) ?? null;
+      const vehicle = vehicleMap.get(row.vehicleId) ?? null;
+
+      return {
+        transactionId: row.id,
+        queueBookingId: row.queueBookingId,
+        servedAt: row.servedAt.toISOString(),
+        litersDispensed: row.litersDispensed,
+        receiptRef: row.receiptRef ?? null,
+        station: {
+          id: stationId,
+          name: null, // Will be filled by controller if needed
+          latitude: null,
+          longitude: null,
+          phone: null,
+        },
+        vehicle: vehicle
+          ? {
+              id: vehicle.id,
+              plateNumber: vehicle.plateNumber,
+              categoryId: vehicle.categoryId,
+              label: vehicle.label,
+            }
+          : null,
+        payment: payment
+          ? {
+              id: payment.id,
+              status: payment.status,
+              fuelType: payment.fuelTypeCode,
+              litersRequested: payment.litersRequested,
+              pricePerLiter: payment.pricePerLiter,
+              amount: payment.amount,
+              currency: payment.currency,
+              paidAt: payment.paidAt ? payment.paidAt.toISOString() : null,
+            }
+          : null,
+      };
+    });
+  }
+
+  async getWorkerTransaction(stationId: number, transactionId: number) {
+    const [row] = await this.db
+      .select()
+      .from(schema.transactions)
+      .where(
+        and(
+          eq(schema.transactions.id, transactionId),
+          eq(schema.transactions.stationId, stationId),
+        ),
+      )
+      .limit(1);
+
+    if (!row) {
+      throw new NotFoundException('Transaction not found');
+    }
+
+    const [payment] = await this.db
+      .select()
+      .from(schema.payments)
+      .where(eq(schema.payments.id, row.paymentId))
+      .limit(1);
+    const [vehicle] = await this.db
+      .select()
+      .from(schema.vehicles)
+      .where(eq(schema.vehicles.id, row.vehicleId))
+      .limit(1);
+
+    return {
+      transactionId: row.id,
+      queueBookingId: row.queueBookingId,
+      servedAt: row.servedAt.toISOString(),
+      litersDispensed: row.litersDispensed,
+      receiptRef: row.receiptRef ?? null,
+      station: {
+        id: stationId,
+        name: null, // Will be filled by controller if needed
+        latitude: null,
+        longitude: null,
+        phone: null,
+      },
+      vehicle: vehicle
+        ? {
+            id: vehicle.id,
+            plateNumber: vehicle.plateNumber,
+            categoryId: vehicle.categoryId,
+            label: vehicle.label,
+          }
+        : null,
+      payment: payment
+        ? {
+            id: payment.id,
+            status: payment.status,
+            fuelType: payment.fuelTypeCode,
+            litersRequested: payment.litersRequested,
+            pricePerLiter: payment.pricePerLiter,
+            amount: payment.amount,
+            currency: payment.currency,
+            paidAt: payment.paidAt ? payment.paidAt.toISOString() : null,
+            txRef: payment.txRef,
+          }
+        : null,
     };
   }
 }

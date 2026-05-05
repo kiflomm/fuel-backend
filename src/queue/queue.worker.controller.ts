@@ -7,6 +7,9 @@ import {
   Post,
   UseGuards,
   BadRequestException,
+  Param,
+  ParseIntPipe,
+  Query,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -24,6 +27,7 @@ import type { CurrentUserPayload } from '../auth/decorators/current-user.decorat
 import { QueueService } from './queue.service';
 import { WorkerVerifyDto } from './dto/worker-verify.dto';
 import { WorkerCompleteDto } from './dto/worker-complete.dto';
+import { DateRangeQueryDto } from '../owner/dto/date-range-query.dto';
 
 @ApiTags('Queue (Worker)')
 @ApiBearerAuth('JWT-auth')
@@ -97,6 +101,46 @@ export class QueueWorkerController {
     return {
       success: true,
       message: 'Booking completed',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Get('transactions')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'List transactions for current worker' })
+  @ApiOkResponse({ description: 'Transactions retrieved' })
+  async listTransactions(
+    @CurrentUser() user: CurrentUserPayload,
+    @Query() query: DateRangeQueryDto,
+  ) {
+    if (!user.stationId) {
+      throw new BadRequestException('Station worker is not assigned to a station');
+    }
+    const data = await this.queueService.listWorkerTransactions(user.stationId, query);
+    return {
+      success: true,
+      message: 'Transactions retrieved',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Get('transactions/:id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get a transaction for current worker' })
+  @ApiOkResponse({ description: 'Transaction retrieved' })
+  async getTransaction(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    if (!user.stationId) {
+      throw new BadRequestException('Station worker is not assigned to a station');
+    }
+    const data = await this.queueService.getWorkerTransaction(user.stationId, id);
+    return {
+      success: true,
+      message: 'Transaction retrieved',
       data,
       timestamp: new Date().toISOString(),
     };
