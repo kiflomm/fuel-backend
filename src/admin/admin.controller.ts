@@ -217,6 +217,7 @@ export class AdminController {
   @ApiCreatedResponse({ description: 'Station manager created' })
   @AuditAction('CREATE_STATION_MANAGER', 'users')
   async createStationManager(@Body() dto: CreateStationManagerDto) {
+
     const data = await this.adminService.createStationManager(dto);
     return {
       success: true,

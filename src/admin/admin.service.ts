@@ -50,17 +50,23 @@ export class AdminService {
     return bcrypt.hash(plain, 10);
   }
 
+  private formatDate(date: Date | string | null | undefined): string {
+    if (!date) return new Date().toISOString();
+    const d = typeof date === 'string' ? new Date(date) : date;
+    return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+  }
+
   private mapUser(row: typeof schema.users.$inferSelect) {
     return {
-      id: row.id.toString(),
+      id: row.id,
       email: row.email,
       firstName: row.firstName,
       lastName: row.lastName,
       role: row.role,
       stationId: row.stationId ?? null,
       isActive: row.isActive,
-      createdAt: row.createdAt.toISOString(),
-      updatedAt: row.updatedAt.toISOString(),
+      createdAt: this.formatDate(row.createdAt),
+      updatedAt: this.formatDate(row.updatedAt),
     };
   }
 
@@ -73,8 +79,8 @@ export class AdminService {
       phone: row.phone,
       isActive: row.isActive,
       queueIntakePaused: row.queueIntakePaused,
-      createdAt: row.createdAt.toISOString(),
-      updatedAt: row.updatedAt.toISOString(),
+      createdAt: this.formatDate(row.createdAt),
+      updatedAt: this.formatDate(row.updatedAt),
     };
   }
 
@@ -96,11 +102,11 @@ export class AdminService {
         period: rule.period,
         litersLimit: rule.litersLimit,
         isActive: rule.isActive,
-        createdAt: rule.createdAt.toISOString(),
-        updatedAt: rule.updatedAt.toISOString(),
+        createdAt: this.formatDate(rule.createdAt),
+        updatedAt: this.formatDate(rule.updatedAt),
       })),
-      createdAt: row.createdAt.toISOString(),
-      updatedAt: row.updatedAt.toISOString(),
+      createdAt: this.formatDate(row.createdAt),
+      updatedAt: this.formatDate(row.updatedAt),
     };
   }
 
@@ -119,12 +125,12 @@ export class AdminService {
         period: rule.period,
         litersLimit: rule.litersLimit,
         isActive: rule.isActive,
-        createdAt: rule.createdAt.toISOString(),
-        updatedAt: rule.updatedAt.toISOString(),
+        createdAt: this.formatDate(rule.createdAt),
+        updatedAt: this.formatDate(rule.updatedAt),
       })),
       isActive: row.isActive,
-      createdAt: row.createdAt.toISOString(),
-      updatedAt: row.updatedAt.toISOString(),
+      createdAt: this.formatDate(row.createdAt),
+      updatedAt: this.formatDate(row.updatedAt),
     };
   }
 
@@ -262,6 +268,7 @@ export class AdminService {
   }
 
   async createStationManager(dto: CreateStationManagerDto) {
+
     const [station] = await this.db
       .select()
       .from(schema.stations)
@@ -824,8 +831,8 @@ export class AdminService {
         code: row.code,
         name: row.name,
         isActive: row.isActive,
-        createdAt: row.createdAt.toISOString(),
-        updatedAt: row.updatedAt.toISOString(),
+        createdAt: this.formatDate(row.createdAt),
+        updatedAt: this.formatDate(row.updatedAt),
       };
     } catch (e) {
       if (isPgUniqueViolation(e)) {
@@ -905,8 +912,8 @@ export class AdminService {
         fuelTypeName: fuelType.name,
         pricePerLiter: row.pricePerLiter,
         isActive: row.isActive,
-        createdAt: row.createdAt.toISOString(),
-        updatedAt: row.updatedAt.toISOString(),
+        createdAt: this.formatDate(row.createdAt),
+        updatedAt: this.formatDate(row.updatedAt),
       };
     }
 
@@ -926,8 +933,8 @@ export class AdminService {
         fuelTypeName: fuelType.name,
         pricePerLiter: row.pricePerLiter,
         isActive: row.isActive,
-        createdAt: row.createdAt.toISOString(),
-        updatedAt: row.updatedAt.toISOString(),
+        createdAt: this.formatDate(row.createdAt),
+        updatedAt: this.formatDate(row.updatedAt),
       };
     } catch (e) {
       if (isPgUniqueViolation(e)) {
@@ -959,8 +966,8 @@ export class AdminService {
       fuelTypeName: row.fuelTypeName,
       pricePerLiter: row.pricePerLiter,
       isActive: row.isActive,
-      createdAt: row.createdAt.toISOString(),
-      updatedAt: row.updatedAt.toISOString(),
+      createdAt: this.formatDate(row.createdAt),
+      updatedAt: this.formatDate(row.updatedAt),
     }));
   }
 
@@ -1267,8 +1274,8 @@ export class AdminService {
 
     return {
       filters: {
-        from: fromDate ? fromDate.toISOString() : null,
-        to: toDate ? toDate.toISOString() : null,
+        from: fromDate ? this.formatDate(fromDate) : null,
+        to: toDate ? this.formatDate(toDate) : null,
         stationId: query.stationId ?? null,
       },
       totalsOverall: {
@@ -1450,7 +1457,7 @@ export class AdminService {
           totalLitersDispensed: entry.totalLitersDispensed.toFixed(2),
           totalGrossAmount: entry.totalGrossAmount.toFixed(2),
           latestServiceAt: entry.latestServiceAt
-            ? entry.latestServiceAt.toISOString()
+            ? this.formatDate(entry.latestServiceAt)
             : null,
         };
       });
