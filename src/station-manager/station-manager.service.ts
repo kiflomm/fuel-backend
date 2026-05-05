@@ -431,10 +431,19 @@ export class StationManagerService {
   async getDailyTotals(managerUserId: number, query: DailyTotalsQueryDto) {
     const { station } = await this.getManagerContext(managerUserId);
 
-    const resolvedDate =
-      query.date ?? new Date().toISOString().slice(0, 10);
-    const start = new Date(`${resolvedDate}T00:00:00.000Z`);
-    const end = new Date(`${resolvedDate}T23:59:59.999Z`);
+    let start: Date;
+    let end: Date;
+
+    if (query.from || query.to) {
+      const { fromDate, toDate } = this.normalizeDateRange(query.from, query.to);
+      start = fromDate ?? new Date(0);
+      end = toDate ?? new Date();
+    } else {
+      const resolvedDate =
+        query.date ?? new Date().toISOString().slice(0, 10);
+      start = new Date(`${resolvedDate}T00:00:00.000Z`);
+      end = new Date(`${resolvedDate}T23:59:59.999Z`);
+    }
 
     const rows = await this.db
       .select()
@@ -456,29 +465,43 @@ export class StationManagerService {
       : [];
     const paymentMap = new Map(payments.map((row) => [row.id, row]));
 
-    const totals = rows.reduce(
-      (acc, row) => {
-        acc.completedTransactionCount += 1;
-        acc.totalLitersDispensed += Number(row.litersDispensed);
-        acc.uniqueVehicleIds.add(row.vehicleId);
-        acc.totalGrossAmount += Number(paymentMap.get(row.paymentId)?.amount ?? 0);
-        return acc;
-      },
+    const dailyMap = new Map<
+      string,
       {
+        completedTransactionCount: number;
+        totalLitersDispensed: number;
+        totalGrossAmount: number;
+        uniqueVehicleIds: Set<number>;
+      }
+    >();
+
+    for (const row of rows) {
+      const dateKey = row.servedAt.toISOString().slice(0, 10);
+      const current = dailyMap.get(dateKey) ?? {
         completedTransactionCount: 0,
         totalLitersDispensed: 0,
         totalGrossAmount: 0,
         uniqueVehicleIds: new Set<number>(),
-      },
-    );
+      };
 
-    return {
-      date: resolvedDate,
-      completedTransactionCount: totals.completedTransactionCount,
-      totalLitersDispensed: totals.totalLitersDispensed.toFixed(2),
-      totalGrossAmount: totals.totalGrossAmount.toFixed(2),
-      uniqueVehiclesServedCount: totals.uniqueVehicleIds.size,
-    };
+      current.completedTransactionCount += 1;
+      current.totalLitersDispensed += Number(row.litersDispensed);
+      current.uniqueVehicleIds.add(row.vehicleId);
+      current.totalGrossAmount += Number(
+        paymentMap.get(row.paymentId)?.amount ?? 0,
+      );
+      dailyMap.set(dateKey, current);
+    }
+
+    return [...dailyMap.entries()]
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([date, totals]) => ({
+        date,
+        completedTransactionCount: totals.completedTransactionCount,
+        totalLitersDispensed: totals.totalLitersDispensed.toFixed(2),
+        totalGrossAmount: totals.totalGrossAmount.toFixed(2),
+        uniqueVehiclesServedCount: totals.uniqueVehicleIds.size,
+      }));
   }
 
   async getServiceActivity(
