@@ -21,7 +21,7 @@ async function main() {
   }
 
   const email = process.env.SEED_ADMIN_EMAIL ?? 'admin@example.com';
-  const password = process.env.SEED_ADMIN_PASSWORD ?? 'changeme';
+  const password = process.env.SEED_ADMIN_PASSWORD ?? 'admin123';
   const firstName = process.env.SEED_ADMIN_FIRST_NAME ?? 'Government';
   const lastName = process.env.SEED_ADMIN_LAST_NAME ?? 'Admin';
 
