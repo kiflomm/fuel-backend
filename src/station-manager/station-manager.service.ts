@@ -120,9 +120,23 @@ export class StationManagerService {
     return worker;
   }
 
+  private readonly dateOnlyYmd = /^\d{4}-\d{2}-\d{2}$/;
+
+  private parseRangeStart(value: string): Date {
+    return this.dateOnlyYmd.test(value)
+      ? new Date(`${value}T00:00:00.000Z`)
+      : new Date(value);
+  }
+
+  private parseRangeEnd(value: string): Date {
+    return this.dateOnlyYmd.test(value)
+      ? new Date(`${value}T23:59:59.999Z`)
+      : new Date(value);
+  }
+
   private normalizeDateRange(from?: string, to?: string) {
-    const fromDate = from ? new Date(from) : undefined;
-    const toDate = to ? new Date(to) : undefined;
+    const fromDate = from ? this.parseRangeStart(from) : undefined;
+    const toDate = to ? this.parseRangeEnd(to) : undefined;
 
     if (
       fromDate &&
@@ -135,6 +149,18 @@ export class StationManagerService {
     }
 
     return { fromDate, toDate };
+  }
+
+  private addCalendarDaysYmd(ymd: string, deltaDays: number): string {
+    const d = new Date(`${ymd}T12:00:00.000Z`);
+    d.setUTCDate(d.getUTCDate() + deltaDays);
+    return d.toISOString().slice(0, 10);
+  }
+
+  private defaultDailyTotalsRangeYmd(): { fromYmd: string; toYmd: string } {
+    const toYmd = new Date().toISOString().slice(0, 10);
+    const fromYmd = this.addCalendarDaysYmd(toYmd, -7);
+    return { fromYmd, toYmd };
   }
 
   async createStationWorker(managerUserId: number, dto: CreateStationWorkerDto) {
@@ -431,10 +457,34 @@ export class StationManagerService {
   async getDailyTotals(managerUserId: number, query: DailyTotalsQueryDto) {
     const { station } = await this.getManagerContext(managerUserId);
 
-    const resolvedDate =
-      query.date ?? new Date().toISOString().slice(0, 10);
-    const start = new Date(`${resolvedDate}T00:00:00.000Z`);
-    const end = new Date(`${resolvedDate}T23:59:59.999Z`);
+    let fromYmd: string;
+    let toYmd: string;
+
+    if (query.date) {
+      fromYmd = query.date;
+      toYmd = query.date;
+    } else if (query.from || query.to) {
+      const todayYmd = new Date().toISOString().slice(0, 10);
+      if (query.from && query.to) {
+        fromYmd = query.from;
+        toYmd = query.to;
+      } else if (query.from) {
+        fromYmd = query.from;
+        toYmd = todayYmd;
+      } else {
+        toYmd = query.to as string;
+        fromYmd = this.addCalendarDaysYmd(toYmd, -7);
+      }
+    } else {
+      ({ fromYmd, toYmd } = this.defaultDailyTotalsRangeYmd());
+    }
+
+    if (fromYmd > toYmd) {
+      throw new BadRequestException('from must be earlier than or equal to to');
+    }
+
+    const rangeStart = new Date(`${fromYmd}T00:00:00.000Z`);
+    const rangeEnd = new Date(`${toYmd}T23:59:59.999Z`);
 
     const rows = await this.db
       .select()
@@ -442,8 +492,8 @@ export class StationManagerService {
       .where(
         and(
           eq(schema.transactions.stationId, station.id),
-          gte(schema.transactions.servedAt, start),
-          lte(schema.transactions.servedAt, end),
+          gte(schema.transactions.servedAt, rangeStart),
+          lte(schema.transactions.servedAt, rangeEnd),
         ),
       );
 
@@ -456,29 +506,54 @@ export class StationManagerService {
       : [];
     const paymentMap = new Map(payments.map((row) => [row.id, row]));
 
-    const totals = rows.reduce(
-      (acc, row) => {
-        acc.completedTransactionCount += 1;
-        acc.totalLitersDispensed += Number(row.litersDispensed);
-        acc.uniqueVehicleIds.add(row.vehicleId);
-        acc.totalGrossAmount += Number(paymentMap.get(row.paymentId)?.amount ?? 0);
-        return acc;
-      },
-      {
-        completedTransactionCount: 0,
-        totalLitersDispensed: 0,
-        totalGrossAmount: 0,
-        uniqueVehicleIds: new Set<number>(),
-      },
-    );
-
-    return {
-      date: resolvedDate,
-      completedTransactionCount: totals.completedTransactionCount,
-      totalLitersDispensed: totals.totalLitersDispensed.toFixed(2),
-      totalGrossAmount: totals.totalGrossAmount.toFixed(2),
-      uniqueVehiclesServedCount: totals.uniqueVehicleIds.size,
+    type DayAgg = {
+      completedTransactionCount: number;
+      totalLitersDispensed: number;
+      totalGrossAmount: number;
+      uniqueVehicleIds: Set<number>;
     };
+
+    const byDay = new Map<string, DayAgg>();
+
+    for (const row of rows) {
+      const dayKey = row.servedAt.toISOString().slice(0, 10);
+      const agg =
+        byDay.get(dayKey) ?? {
+          completedTransactionCount: 0,
+          totalLitersDispensed: 0,
+          totalGrossAmount: 0,
+          uniqueVehicleIds: new Set<number>(),
+        };
+      agg.completedTransactionCount += 1;
+      agg.totalLitersDispensed += Number(row.litersDispensed);
+      agg.totalGrossAmount += Number(paymentMap.get(row.paymentId)?.amount ?? 0);
+      agg.uniqueVehicleIds.add(row.vehicleId);
+      byDay.set(dayKey, agg);
+    }
+
+    const result: Array<{
+      date: string;
+      completedTransactionCount: number;
+      totalLitersDispensed: string;
+      totalGrossAmount: string;
+      uniqueVehiclesServedCount: number;
+    }> = [];
+
+    let cursor = fromYmd;
+    while (cursor <= toYmd) {
+      const agg = byDay.get(cursor);
+      result.push({
+        date: cursor,
+        completedTransactionCount: agg?.completedTransactionCount ?? 0,
+        totalLitersDispensed: (agg?.totalLitersDispensed ?? 0).toFixed(2),
+        totalGrossAmount: (agg?.totalGrossAmount ?? 0).toFixed(2),
+        uniqueVehiclesServedCount: agg?.uniqueVehicleIds.size ?? 0,
+      });
+      cursor = this.addCalendarDaysYmd(cursor, 1);
+    }
+
+    result.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+    return result;
   }
 
   async getServiceActivity(

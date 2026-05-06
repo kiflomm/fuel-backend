@@ -107,7 +107,15 @@ class MockStationManagerService {
   }
 
   async getDailyTotals() {
-    return { date: '2026-04-15', completedTransactionCount: 0 };
+    return [
+      {
+        date: '2026-04-15',
+        completedTransactionCount: 0,
+        totalLitersDispensed: '0.00',
+        totalGrossAmount: '0.00',
+        uniqueVehiclesServedCount: 0,
+      },
+    ];
   }
 
   async getServiceActivity() {
