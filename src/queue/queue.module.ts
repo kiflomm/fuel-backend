@@ -7,9 +7,10 @@ import { QueueWorkerController } from './queue.worker.controller';
 import { QueueService } from './queue.service';
 import { QuotaService } from './quota.service';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { RevenueReportingModule } from '../revenue-reporting/revenue-reporting.module';
 
 @Module({
-  imports: [DrizzleModule, AuthModule, PaymentModule],
+  imports: [DrizzleModule, AuthModule, PaymentModule, RevenueReportingModule],
   controllers: [QueueController, QueueWorkerController],
   providers: [QueueService, QuotaService, RolesGuard],
 })

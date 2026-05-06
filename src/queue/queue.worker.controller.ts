@@ -28,6 +28,8 @@ import { QueueService } from './queue.service';
 import { WorkerVerifyDto } from './dto/worker-verify.dto';
 import { WorkerCompleteDto } from './dto/worker-complete.dto';
 import { DateRangeQueryDto } from '../owner/dto/date-range-query.dto';
+import { RevenueTimeseriesQueryDto } from '../revenue-reporting/dto/revenue-timeseries-query.dto';
+import { RevenueReportingService } from '../revenue-reporting/revenue-reporting.service';
 
 @ApiTags('Queue (Worker)')
 @ApiBearerAuth('JWT-auth')
@@ -37,7 +39,10 @@ import { DateRangeQueryDto } from '../owner/dto/date-range-query.dto';
 @Roles('STATION_WORKER')
 @Controller('queue/worker')
 export class QueueWorkerController {
-  constructor(private readonly queueService: QueueService) {}
+  constructor(
+    private readonly queueService: QueueService,
+    private readonly revenueReportingService: RevenueReportingService,
+  ) {}
 
   @Get('station')
   @HttpCode(HttpStatus.OK)
@@ -141,6 +146,35 @@ export class QueueWorkerController {
     return {
       success: true,
       message: 'Transaction retrieved',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Get('revenue-timeseries')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Revenue time series for the worker’s station only (daily / weekly / monthly). Counts only SUCCESS payments. Station is taken from the JWT, not query params.',
+  })
+  @ApiOkResponse({ description: 'Revenue time series retrieved' })
+  async getRevenueTimeseries(
+    @CurrentUser() user: CurrentUserPayload,
+    @Query() query: RevenueTimeseriesQueryDto,
+  ) {
+    if (!user.stationId) {
+      throw new BadRequestException('Station worker is not assigned to a station');
+    }
+    const data = await this.revenueReportingService.getTimeseries(
+      query.from,
+      query.to,
+      query.granularity,
+      { type: 'STATION', stationId: user.stationId },
+      false,
+    );
+    return {
+      success: true,
+      message: 'Revenue time series retrieved',
       data,
       timestamp: new Date().toISOString(),
     };

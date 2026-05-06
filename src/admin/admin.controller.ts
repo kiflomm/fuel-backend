@@ -51,6 +51,8 @@ import { AdminDistributionQueryDto } from './dto/admin-distribution-query.dto';
 import { UpdateVehicleQuotaRulesDto } from './dto/update-vehicle-quota-rules.dto';
 import { AdjustStationFuelInventoryDto } from './dto/adjust-station-fuel-inventory.dto';
 import { ListFuelInventoryAdjustmentsQueryDto } from './dto/list-fuel-inventory-adjustments-query.dto';
+import { AdminRevenueTimeseriesQueryDto } from '../revenue-reporting/dto/admin-revenue-timeseries-query.dto';
+import { RevenueReportingService } from '../revenue-reporting/revenue-reporting.service';
 
 @ApiTags('Admin')
 @ApiBearerAuth('JWT-auth')
@@ -64,6 +66,7 @@ export class AdminController {
     private readonly adminService: AdminService,
     private readonly auditService: AuditService,
     private readonly fuelInventoryService: FuelInventoryService,
+    private readonly revenueReportingService: RevenueReportingService,
   ) {}
 
   @Get('health')
@@ -517,6 +520,28 @@ export class AdminController {
     return {
       success: true,
       message: 'Service activity retrieved',
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Get('reports/revenue-timeseries')
+  @ApiOperation({
+    summary:
+      'Revenue time series (daily / weekly / monthly) across all stations or one station, with per-station breakdown. Counts only SUCCESS payments.',
+  })
+  @ApiOkResponse({ description: 'Revenue time series retrieved' })
+  async getRevenueTimeseries(@Query() query: AdminRevenueTimeseriesQueryDto) {
+    const data = await this.revenueReportingService.getTimeseries(
+      query.from,
+      query.to,
+      query.granularity,
+      { type: 'GLOBAL', stationId: query.stationId },
+      true,
+    );
+    return {
+      success: true,
+      message: 'Revenue time series retrieved',
       data,
       timestamp: new Date().toISOString(),
     };
