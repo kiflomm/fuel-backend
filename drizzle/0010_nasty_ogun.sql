@@ -1,0 +1,2 @@
+CREATE INDEX "transactions_station_id_served_at_idx" ON "transactions" USING btree ("station_id","served_at");--> statement-breakpoint
+CREATE INDEX "transactions_served_at_idx" ON "transactions" USING btree ("served_at");

@@ -71,6 +71,13 @@
       "when": 1777842345768,
       "tag": "0009_fast_selene",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1778041697658,
+      "tag": "0010_nasty_ogun",
+      "breakpoints": true
     }
   ]
 }
