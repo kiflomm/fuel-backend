@@ -32,6 +32,32 @@ import {
       private configService: ConfigService,
       private readonly mailerService: MailerService,
     ) { }
+
+    private async stationNameFor(stationId: number | null): Promise<string | null> {
+      if (stationId == null) return null;
+      const [row] = await this.db
+        .select({ name: schema.stations.name })
+        .from(schema.stations)
+        .where(eq(schema.stations.id, stationId))
+        .limit(1);
+      return row?.name ?? null;
+    }
+
+    private async mapUserWithStationName(user: typeof schema.users.$inferSelect) {
+      const stationName = await this.stationNameFor(user.stationId ?? null);
+      return {
+        id: user.id.toString(),
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        stationId: user.stationId ?? null,
+        stationName,
+        isActive: user.isActive,
+        createdAt: user.createdAt.toISOString(),
+        updatedAt: user.updatedAt.toISOString(),
+      };
+    }
   
     async validateUser(email: string, password: string) {
       const [user] = await this.db
@@ -79,23 +105,14 @@ import {
   
     async login(loginDto: LoginDto) {
       const user = await this.validateUser(loginDto.email, loginDto.password);
-  
+
       const tokens = await this.generateTokens(user);
-  
+      const userPayload = await this.mapUserWithStationName(user);
+
       return {
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
-        user: {
-          id: user.id.toString(),
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          role: user.role,
-          stationId: user.stationId ?? null,
-          isActive: user.isActive,
-          createdAt: user.createdAt.toISOString(),
-          updatedAt: user.updatedAt.toISOString(),
-        },
+        user: userPayload,
       };
     }
   
@@ -117,21 +134,12 @@ import {
   
       // Generate new tokens
       const tokens = await this.generateTokens(user);
-  
+      const userPayload = await this.mapUserWithStationName(user);
+
       return {
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
-        user: {
-          id: user.id.toString(),
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          role: user.role,
-          stationId: user.stationId ?? null,
-          isActive: user.isActive,
-          createdAt: user.createdAt.toISOString(),
-          updatedAt: user.updatedAt.toISOString(),
-        },
+        user: userPayload,
       };
     }
   
@@ -151,18 +159,8 @@ import {
       if (!user) {
         throw new NotFoundException('User not found');
       }
-  
-      return {
-        id: user.id.toString(),
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-        stationId: user.stationId ?? null,
-        isActive: user.isActive,
-        createdAt: user.createdAt.toISOString(),
-        updatedAt: user.updatedAt.toISOString(),
-      };
+
+      return this.mapUserWithStationName(user);
     }
   
     async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {

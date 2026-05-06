@@ -570,7 +570,23 @@ export class AdminService {
 
   async listUsers() {
     const rows = await this.db.select().from(schema.users);
-    return rows.map((row) => this.mapUser(row));
+    const stationIds = [
+      ...new Set(
+        rows.map((r) => r.stationId).filter((id): id is number => id != null),
+      ),
+    ];
+    const stationRows = stationIds.length
+      ? await this.db
+          .select({ id: schema.stations.id, name: schema.stations.name })
+          .from(schema.stations)
+          .where(inArray(schema.stations.id, stationIds))
+      : [];
+    const stationNameById = new Map(stationRows.map((s) => [s.id, s.name] as const));
+    return rows.map((row) => ({
+      ...this.mapUser(row),
+      stationName:
+        row.stationId != null ? stationNameById.get(row.stationId) ?? null : null,
+    }));
   }
 
   async getUserById(id: number) {
@@ -1346,9 +1362,20 @@ export class AdminService {
       },
     );
 
+    let station: { id: number; name: string } | null = null;
+    if (query.stationId !== undefined) {
+      const [s] = await this.db
+        .select({ id: schema.stations.id, name: schema.stations.name })
+        .from(schema.stations)
+        .where(eq(schema.stations.id, query.stationId))
+        .limit(1);
+      if (s) station = { id: s.id, name: s.name };
+    }
+
     return {
       date: resolvedDate,
       stationId: query.stationId ?? null,
+      station,
       completedTransactionCount: totals.completedTransactionCount,
       totalLitersDispensed: totals.totalLitersDispensed.toFixed(2),
       totalGrossAmount: totals.totalGrossAmount.toFixed(2),
@@ -1423,36 +1450,54 @@ export class AdminService {
       aggregates.set(key, current);
     }
 
-    return [...aggregates.values()]
-      .sort((a, b) => {
-        const aTime = a.latestServiceAt?.getTime() ?? 0;
-        const bTime = b.latestServiceAt?.getTime() ?? 0;
-        return bTime - aTime;
-      })
-      .map((entry) => {
-        const worker = workerMap.get(entry.stationWorkerUserId) ?? null;
-        return {
-          stationId: entry.stationId,
-          stationWorker: worker
-            ? {
-                id: worker.id,
-                firstName: worker.firstName,
-                lastName: worker.lastName,
-                email: worker.email,
-              }
-            : {
-                id: entry.stationWorkerUserId,
-                firstName: null,
-                lastName: null,
-                email: null,
-              },
-          completedTransactionCount: entry.completedTransactionCount,
-          totalLitersDispensed: entry.totalLitersDispensed.toFixed(2),
-          totalGrossAmount: entry.totalGrossAmount.toFixed(2),
-          latestServiceAt: entry.latestServiceAt
-            ? entry.latestServiceAt.toISOString()
-            : null,
-        };
-      });
+    const activityRows = [...aggregates.values()].sort((a, b) => {
+      const aTime = a.latestServiceAt?.getTime() ?? 0;
+      const bTime = b.latestServiceAt?.getTime() ?? 0;
+      return bTime - aTime;
+    });
+
+    const stationIdsForActivity = [
+      ...new Set(activityRows.map((r) => r.stationId)),
+    ];
+    const stationRowsForActivity = stationIdsForActivity.length
+      ? await this.db
+          .select({ id: schema.stations.id, name: schema.stations.name })
+          .from(schema.stations)
+          .where(inArray(schema.stations.id, stationIdsForActivity))
+      : [];
+    const stationNameByIdActivity = new Map(
+      stationRowsForActivity.map((s) => [s.id, s.name] as const),
+    );
+
+    return activityRows.map((entry) => {
+      const worker = workerMap.get(entry.stationWorkerUserId) ?? null;
+      const stationName = stationNameByIdActivity.get(entry.stationId) ?? null;
+      return {
+        stationId: entry.stationId,
+        station: {
+          id: entry.stationId,
+          name: stationName,
+        },
+        stationWorker: worker
+          ? {
+              id: worker.id,
+              firstName: worker.firstName,
+              lastName: worker.lastName,
+              email: worker.email,
+            }
+          : {
+              id: entry.stationWorkerUserId,
+              firstName: null,
+              lastName: null,
+              email: null,
+            },
+        completedTransactionCount: entry.completedTransactionCount,
+        totalLitersDispensed: entry.totalLitersDispensed.toFixed(2),
+        totalGrossAmount: entry.totalGrossAmount.toFixed(2),
+        latestServiceAt: entry.latestServiceAt
+          ? entry.latestServiceAt.toISOString()
+          : null,
+      };
+    });
   }
 }
