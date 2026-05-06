@@ -6,6 +6,7 @@ import {
   numeric,
   text,
   unique,
+  index,
 } from 'drizzle-orm/pg-core';
 import { queueBookings } from './queue-bookings';
 import { stations } from './stations';
@@ -44,10 +45,10 @@ export const transactions = pgTable(
     servedAt: timestamp('served_at').notNull().defaultNow(),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
-  (t) => ({
-    bookingUnique: unique('transactions_queue_booking_id_unique').on(
-      t.queueBookingId,
-    ),
-  }),
+  (t) => [
+    unique('transactions_queue_booking_id_unique').on(t.queueBookingId),
+    index('transactions_station_id_served_at_idx').on(t.stationId, t.servedAt),
+    index('transactions_served_at_idx').on(t.servedAt),
+  ],
 );
 
